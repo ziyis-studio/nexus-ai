@@ -1,0 +1,615 @@
+{
+  "recorded_at": "2026-10-26T20:45:55.790751+00:00",
+  "environment": {
+    "os": "Windows-11-10.0.26300-SP0",
+    "python": "3.12.14",
+    "postgresql": "PostgreSQL 18.4 on x86_64-windows, compiled by msvc-19.44.35226, 64-bit",
+    "cpu": "Intel64 Family 6 Model 151 Stepping 2, GenuineIntel",
+    "cpu_count": 12,
+    "transport": "loopback native PostgreSQL",
+    "auth": "synthetic auth schema; not hosted Supabase",
+    "query_roles": "authenticated with membership RLS; knowledge retrieval uses restricted nexus_worker"
+  },
+  "tickets": 10000,
+  "tenants": 2,
+  "roles": 3,
+  "measurements": {
+    "ticket_list": {
+      "median_ms": 0.375,
+      "p95_ms": 0.486,
+      "samples": 60
+    },
+    "status_filter": {
+      "median_ms": 0.442,
+      "p95_ms": 0.747,
+      "samples": 60
+    },
+    "membership": {
+      "median_ms": 0.165,
+      "p95_ms": 0.28,
+      "samples": 60
+    },
+    "execution_history": {
+      "median_ms": 0.374,
+      "p95_ms": 0.522,
+      "samples": 60
+    },
+    "knowledge_retrieval": {
+      "median_ms": 0.108,
+      "p95_ms": 0.262,
+      "samples": 60
+    }
+  },
+  "ten_concurrent_clients": [
+    {
+      "median_ms": 0.519,
+      "p95_ms": 0.946,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.553,
+      "p95_ms": 0.962,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.497,
+      "p95_ms": 1.27,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.483,
+      "p95_ms": 0.855,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.496,
+      "p95_ms": 1.029,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.59,
+      "p95_ms": 0.96,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.736,
+      "p95_ms": 1.487,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.735,
+      "p95_ms": 1.434,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.618,
+      "p95_ms": 0.96,
+      "samples": 60
+    },
+    {
+      "median_ms": 0.588,
+      "p95_ms": 0.982,
+      "samples": 60
+    }
+  ],
+  "status_index_comparison": {
+    "before": [
+      {
+        "Plan": {
+          "Node Type": "Limit",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Startup Cost": 0.29,
+          "Total Cost": 118.08,
+          "Plan Rows": 20,
+          "Plan Width": 53,
+          "Actual Startup Time": 0.048,
+          "Actual Total Time": 0.188,
+          "Actual Rows": 20.0,
+          "Actual Loops": 1,
+          "Disabled": false,
+          "Shared Hit Blocks": 28,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "Index Scan",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "tickets_page",
+              "Relation Name": "tickets",
+              "Alias": "tickets",
+              "Startup Cost": 0.29,
+              "Total Cost": 2456.36,
+              "Plan Rows": 417,
+              "Plan Width": 53,
+              "Actual Startup Time": 0.048,
+              "Actual Total Time": 0.186,
+              "Actual Rows": 20.0,
+              "Actual Loops": 1,
+              "Disabled": false,
+              "Index Cond": "(tenant_id = 'b5be3ccc-c618-44cb-8331-cac5540da27d'::uuid)",
+              "Rows Removed by Index Recheck": 0,
+              "Filter": "((status = 'open'::text) AND nexus_private.has_role(tenant_id, '{admin,agent,viewer}'::text[]))",
+              "Rows Removed by Filter": 60,
+              "Index Searches": 1,
+              "Shared Hit Blocks": 28,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 5,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.955,
+        "Triggers": [],
+        "Execution Time": 0.203
+      }
+    ],
+    "after": [
+      {
+        "Plan": {
+          "Node Type": "Limit",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Startup Cost": 0.29,
+          "Total Cost": 61.39,
+          "Plan Rows": 20,
+          "Plan Width": 53,
+          "Actual Startup Time": 0.101,
+          "Actual Total Time": 0.343,
+          "Actual Rows": 20.0,
+          "Actual Loops": 1,
+          "Disabled": false,
+          "Shared Hit Blocks": 25,
+          "Shared Read Blocks": 3,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "Index Scan",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "tickets_status_page",
+              "Relation Name": "tickets",
+              "Alias": "tickets",
+              "Startup Cost": 0.29,
+              "Total Cost": 1274.37,
+              "Plan Rows": 417,
+              "Plan Width": 53,
+              "Actual Startup Time": 0.1,
+              "Actual Total Time": 0.34,
+              "Actual Rows": 20.0,
+              "Actual Loops": 1,
+              "Disabled": false,
+              "Index Cond": "((tenant_id = 'b5be3ccc-c618-44cb-8331-cac5540da27d'::uuid) AND (status = 'open'::text))",
+              "Rows Removed by Index Recheck": 0,
+              "Filter": "nexus_private.has_role(tenant_id, '{admin,agent,viewer}'::text[])",
+              "Rows Removed by Filter": 0,
+              "Index Searches": 1,
+              "Shared Hit Blocks": 25,
+              "Shared Read Blocks": 3,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 25,
+          "Shared Read Blocks": 1,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 1.894,
+        "Triggers": [],
+        "Execution Time": 0.367
+      }
+    ]
+  },
+  "plans": {
+    "ticket_list": [
+      {
+        "Plan": {
+          "Node Type": "Limit",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Startup Cost": 0.29,
+          "Total Cost": 29.6,
+          "Plan Rows": 20,
+          "Plan Width": 58,
+          "Actual Startup Time": 0.07,
+          "Actual Total Time": 0.261,
+          "Actual Rows": 20.0,
+          "Actual Loops": 1,
+          "Disabled": false,
+          "Shared Hit Blocks": 24,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "Index Scan",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "tickets_page",
+              "Relation Name": "tickets",
+              "Alias": "tickets",
+              "Startup Cost": 0.29,
+              "Total Cost": 2443.86,
+              "Plan Rows": 1667,
+              "Plan Width": 58,
+              "Actual Startup Time": 0.069,
+              "Actual Total Time": 0.258,
+              "Actual Rows": 20.0,
+              "Actual Loops": 1,
+              "Disabled": false,
+              "Index Cond": "(tenant_id = 'b5be3ccc-c618-44cb-8331-cac5540da27d'::uuid)",
+              "Rows Removed by Index Recheck": 0,
+              "Filter": "nexus_private.has_role(tenant_id, '{admin,agent,viewer}'::text[])",
+              "Rows Removed by Filter": 0,
+              "Index Searches": 1,
+              "Shared Hit Blocks": 24,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 0,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.293,
+        "Triggers": [],
+        "Execution Time": 0.283
+      }
+    ],
+    "status_filter": [
+      {
+        "Plan": {
+          "Node Type": "Limit",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Startup Cost": 0.29,
+          "Total Cost": 62.74,
+          "Plan Rows": 20,
+          "Plan Width": 53,
+          "Actual Startup Time": 0.049,
+          "Actual Total Time": 0.194,
+          "Actual Rows": 20.0,
+          "Actual Loops": 1,
+          "Disabled": false,
+          "Shared Hit Blocks": 28,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "Index Scan",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "tickets_status_page",
+              "Relation Name": "tickets",
+              "Alias": "tickets",
+              "Startup Cost": 0.29,
+              "Total Cost": 1302.37,
+              "Plan Rows": 417,
+              "Plan Width": 53,
+              "Actual Startup Time": 0.049,
+              "Actual Total Time": 0.192,
+              "Actual Rows": 20.0,
+              "Actual Loops": 1,
+              "Disabled": false,
+              "Index Cond": "((tenant_id = 'b5be3ccc-c618-44cb-8331-cac5540da27d'::uuid) AND (status = 'open'::text))",
+              "Rows Removed by Index Recheck": 0,
+              "Filter": "nexus_private.has_role(tenant_id, '{admin,agent,viewer}'::text[])",
+              "Rows Removed by Filter": 0,
+              "Index Searches": 1,
+              "Shared Hit Blocks": 28,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 0,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.134,
+        "Triggers": [],
+        "Execution Time": 0.206
+      }
+    ],
+    "membership": [
+      {
+        "Plan": {
+          "Node Type": "Seq Scan",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Relation Name": "memberships",
+          "Alias": "memberships",
+          "Startup Cost": 0.0,
+          "Total Cost": 1.83,
+          "Plan Rows": 1,
+          "Plan Width": 6,
+          "Actual Startup Time": 0.008,
+          "Actual Total Time": 0.009,
+          "Actual Rows": 1.0,
+          "Actual Loops": 1,
+          "Disabled": false,
+          "Filter": "(is_active AND (user_id = '94c8f5b0-fde5-428d-a7cd-7e7bcfab50a7'::uuid) AND (tenant_id = 'b5be3ccc-c618-44cb-8331-cac5540da27d'::uuid) AND (((user_id = (NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text))::uuid) AND is_active) OR nexus_private.has_role(tenant_id, '{admin}'::text[])))",
+          "Rows Removed by Filter": 2,
+          "Shared Hit Blocks": 1,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning": {
+          "Shared Hit Blocks": 0,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.139,
+        "Triggers": [],
+        "Execution Time": 0.017
+      }
+    ],
+    "execution_history": [
+      {
+        "Plan": {
+          "Node Type": "Limit",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Startup Cost": 0.27,
+          "Total Cost": 32.54,
+          "Plan Rows": 20,
+          "Plan Width": 31,
+          "Actual Startup Time": 0.051,
+          "Actual Total Time": 0.259,
+          "Actual Rows": 20.0,
+          "Actual Loops": 1,
+          "Disabled": false,
+          "Shared Hit Blocks": 37,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "Index Scan",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Scan Direction": "Forward",
+              "Index Name": "runs_page",
+              "Relation Name": "analysis_runs",
+              "Alias": "analysis_runs",
+              "Startup Cost": 0.27,
+              "Total Cost": 53.52,
+              "Plan Rows": 33,
+              "Plan Width": 31,
+              "Actual Startup Time": 0.05,
+              "Actual Total Time": 0.256,
+              "Actual Rows": 20.0,
+              "Actual Loops": 1,
+              "Disabled": false,
+              "Index Cond": "(tenant_id = 'b5be3ccc-c618-44cb-8331-cac5540da27d'::uuid)",
+              "Rows Removed by Index Recheck": 0,
+              "Filter": "nexus_private.has_role(tenant_id, '{admin,agent,viewer}'::text[])",
+              "Rows Removed by Filter": 0,
+              "Index Searches": 1,
+              "Shared Hit Blocks": 37,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 0,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.14,
+        "Triggers": [],
+        "Execution Time": 0.272
+      }
+    ],
+    "knowledge_retrieval": [
+      {
+        "Plan": {
+          "Node Type": "Limit",
+          "Parallel Aware": false,
+          "Async Capable": false,
+          "Startup Cost": 0.0,
+          "Total Cost": 0.33,
+          "Plan Rows": 4,
+          "Plan Width": 16,
+          "Actual Startup Time": 0.006,
+          "Actual Total Time": 0.008,
+          "Actual Rows": 4.0,
+          "Actual Loops": 1,
+          "Disabled": false,
+          "Shared Hit Blocks": 2,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0,
+          "Plans": [
+            {
+              "Node Type": "Seq Scan",
+              "Parent Relationship": "Outer",
+              "Parallel Aware": false,
+              "Async Capable": false,
+              "Relation Name": "knowledge_docs",
+              "Alias": "knowledge_docs",
+              "Startup Cost": 0.0,
+              "Total Cost": 2.45,
+              "Plan Rows": 30,
+              "Plan Width": 16,
+              "Actual Startup Time": 0.006,
+              "Actual Total Time": 0.006,
+              "Actual Rows": 4.0,
+              "Actual Loops": 1,
+              "Disabled": false,
+              "Filter": "(is_active AND (tenant_id = 'b5be3ccc-c618-44cb-8331-cac5540da27d'::uuid) AND (search_vector @@ '''delivery'''::tsquery))",
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 2,
+              "Shared Read Blocks": 0,
+              "Shared Dirtied Blocks": 0,
+              "Shared Written Blocks": 0,
+              "Local Hit Blocks": 0,
+              "Local Read Blocks": 0,
+              "Local Dirtied Blocks": 0,
+              "Local Written Blocks": 0,
+              "Temp Read Blocks": 0,
+              "Temp Written Blocks": 0
+            }
+          ]
+        },
+        "Planning": {
+          "Shared Hit Blocks": 1,
+          "Shared Read Blocks": 0,
+          "Shared Dirtied Blocks": 0,
+          "Shared Written Blocks": 0,
+          "Local Hit Blocks": 0,
+          "Local Read Blocks": 0,
+          "Local Dirtied Blocks": 0,
+          "Local Written Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        "Planning Time": 0.073,
+        "Triggers": [],
+        "Execution Time": 0.015
+      }
+    ]
+  }
+}
