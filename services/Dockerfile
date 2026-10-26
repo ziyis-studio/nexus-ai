@@ -1,5 +1,5 @@
 FROM python:3.12.14-slim
-COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.5 /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
