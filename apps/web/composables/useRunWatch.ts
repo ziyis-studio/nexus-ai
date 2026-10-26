@@ -26,8 +26,10 @@ export const useRunWatch = (tid: string, onUpdate: (run: Run) => Promise<void>) 
     disposed = false
     const current = generation
     let attempts = 0
+    let syncing = false
     const sync = async () => {
-      if (disposed || current !== generation) return
+      if (disposed || current !== generation || syncing) return
+      syncing = true
       try {
         const run = await api<Run>(`/tenants/${tid}/runs/${runId}`)
         if (disposed || current !== generation) return
@@ -38,6 +40,8 @@ export const useRunWatch = (tid: string, onUpdate: (run: Run) => Promise<void>) 
         }
       } catch {
         connection.value = 'reconnecting'
+      } finally {
+        syncing = false
       }
     }
     const connect = async () => {

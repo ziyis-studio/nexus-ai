@@ -86,3 +86,47 @@ test('mobile layout, session restoration, keyboard and logout', async ({ page })
   await page.getByRole('button', { name: 'Sign out', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible()
 })
+
+test('network interruption after acceptance reuses the same analysis operation', async ({ page }) => {
+  await login(page, 'admin@nexus.test')
+  await page.getByRole('button', { name: /Acme Corporation/ }).click()
+  await page.getByRole('button', { name: 'Create ticket' }).click()
+  const subject = `Network recovery ${Date.now()}`
+  await page.getByLabel('Subject', { exact: true }).fill(subject)
+  await page.getByLabel('Customer message').fill('Please help confirm the status of a delayed delivery.')
+  await page.getByRole('dialog').getByRole('button', { name: 'Create ticket' }).click()
+  await expect(page.getByRole('heading', { name: subject })).toBeVisible()
+  const keys: string[] = []
+  page.on('request', (request) => {
+    if (request.url().endsWith('/analyze')) keys.push(request.headers()['idempotency-key'] || '')
+  })
+  let interrupted = false
+  await page.route(/\/api\/v1\/tenants\/[^/]+\/runs\/[^/?]+$/, async (route) => {
+    if (!interrupted) {
+      interrupted = true
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: {
+            code: 'TEST_UNAVAILABLE',
+            message: 'Temporary network interruption. Try again.',
+            request_id: crypto.randomUUID(),
+          },
+        }),
+      })
+    } else await route.continue()
+  })
+  const first = page.waitForResponse((response) => response.url().endsWith('/analyze'))
+  await page.getByRole('button', { name: 'Analyze with AI' }).click()
+  const accepted = await (await first).json()
+  await expect(page.getByRole('alert')).toContainText('Temporary network interruption')
+  const retry = page.waitForResponse((response) => response.url().endsWith('/analyze'))
+  await page.getByRole('button', { name: 'Analyze with AI' }).click()
+  const recovered = await (await retry).json()
+  expect(recovered.run_id).toBe(accepted.run_id)
+  expect(keys).toHaveLength(2)
+  expect(keys[0]).toBeTruthy()
+  expect(keys[0]).toBe(keys[1])
+  await expect(page.getByRole('heading', { name: 'Suggested response' })).toBeVisible({ timeout: 40000 })
+})

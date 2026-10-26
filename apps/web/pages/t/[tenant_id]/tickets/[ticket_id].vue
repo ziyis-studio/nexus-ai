@@ -120,9 +120,9 @@ const analyze = async () => {
       method: 'POST',
       idempotencyKey: analysisKey,
     })
-    analysisKey = null
     const run = await api<Run>(`/tenants/${tid}/runs/${accepted.run_id}`)
     if (!runs.value.some((r) => r.id === run.id)) runs.value.unshift(run)
+    analysisKey = null
     await loadResult(run)
     watcher.watchRun(run.id)
     success('Analysis queued. You can stay here as it progresses.')

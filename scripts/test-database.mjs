@@ -320,6 +320,35 @@ async function main() {
     await db.query("update public.analysis_runs set status='succeeded' where id=$1", [run.id])
     await denied(() => db.query("update public.analysis_runs set status='processing' where id=$1", [run.id]))
   })
+  await check('daily AI quota follows UTC even in a different session timezone', async () => {
+    await db.query('update public.memberships set is_active=true where tenant_id=$1 and user_id=$2', [
+      ids.a,
+      ids.agent,
+    ])
+    const hour = Number(
+      (await db.query("select extract(hour from now() at time zone 'UTC') as hour")).rows[0].hour,
+    )
+    await db.query(
+      `insert into public.analysis_runs(tenant_id,ticket_id,initiated_by,status,model_id,request_hash,ticket_snapshot,created_at)
+      select $1,$2,$3,'failed','fixture','quota-fixture','{}',
+      (date_trunc('day',now() at time zone 'UTC') at time zone 'UTC')+
+      case when extract(hour from now() at time zone 'UTC')>=1 then interval '1 second' else interval '-30 minutes' end
+      from generate_series(1,200)`,
+      [ids.a, ids.ticketA, ids.agent],
+    )
+    const execute = () =>
+      as(ids.agent, async (tx) => {
+        await tx.exec(hour >= 1 ? "set local time zone 'Etc/GMT+1'" : "set local time zone 'Etc/GMT-1'")
+        return tx.query('select public.create_analysis($1,$2,$3,$4)', [
+          ids.a,
+          ids.ticketA,
+          'utc-budget',
+          'fixture',
+        ])
+      })
+    if (hour >= 1) await assert.rejects(execute, (error) => error.message.includes('USAGE_LIMIT'))
+    else await execute()
+  })
   console.log(`${passed} PostgreSQL RLS/constraint checks passed.`)
   await db.close()
 }
