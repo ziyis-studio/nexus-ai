@@ -35,6 +35,10 @@ binary = (
     if os.name == "nt"
     else Path(".local/postgrest/postgrest")
 )
+env["PGRST_DB_URI"] = os.getenv(
+    "SANDBOX_POSTGREST_DATABASE_URL",
+    env["DATABASE_URL"].replace("://postgres:", "://authenticator:", 1),
+)
 skip_postgrest = "--skip-postgrest" in sys.argv
 if not skip_postgrest and (not binary or not binary.exists()):
     raise SystemExit(

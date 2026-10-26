@@ -6,6 +6,10 @@ A multi-tenant ticket intelligence engine built with Nuxt, FastAPI, Supabase Pos
 
 [![CI](https://github.com/ziyis-studio/nexus-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/ziyis-studio/nexus-ai/actions/workflows/ci.yml)
 
+![Ticket workspace with synthetic demo records](docs/screenshots/tickets.png)
+
+[Watch the recorded local walkthrough](docs/demo/product-walkthrough.webm) · [AI workspace](docs/screenshots/analysis.png) · [Knowledge library](docs/screenshots/knowledge.png) · [Mobile view](docs/screenshots/mobile.png)
+
 ## What you can do
 
 - Work across authorized organizations with Admin, Agent and Viewer roles.

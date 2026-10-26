@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main, 'codex/**']
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -102,6 +102,8 @@ jobs:
           uv run python scripts/sandbox-services.py > .local/services.log 2>&1 &
           npm run dev > .local/web.log 2>&1 &
           for i in {1..60}; do curl -fsS http://127.0.0.1:8000/health/ready && curl -fsS http://127.0.0.1:3000/login > /dev/null && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/health/ready
+          curl -fsS http://127.0.0.1:3000/login > /dev/null
       - run: uv run pytest tests/integration -q
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
@@ -144,6 +146,7 @@ jobs:
           npx supabase status -o json > .local/supabase-status.json
           uv run python scripts/run-supabase-services.py > .local/real-services.log 2>&1 &
           for i in {1..60}; do curl -fsS http://127.0.0.1:8000/health/ready && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/health/ready
       - run: uv run pytest tests/supabase -q
       - run: npx supabase stop
         if: always()

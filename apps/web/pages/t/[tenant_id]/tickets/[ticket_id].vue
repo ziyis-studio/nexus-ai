@@ -296,7 +296,9 @@ onBeforeUnmount(() => {
               <span class="ai-star"><NIcon name="Sparkles" :size="20" /></span>
               <h2>Intelligence workspace</h2>
             </div>
-            <span class="ai-label">NEXUS AI</span>
+            <span class="ai-label">{{
+              selectedRun?.model_id === 'fixture' ? 'DEV FIXTURE' : 'NEXUS AI'
+            }}</span>
           </div>
           <div class="ai-body">
             <template v-if="!selectedRun"

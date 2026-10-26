@@ -1,10 +1,12 @@
+import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import fakeredis.aioredis
 import httpx
 import pytest
+import respx
 from app.core.config import Settings
 from app.schemas.models import AIOutput
 from openai import APIConnectionError, APIStatusError, RateLimitError
@@ -89,6 +91,89 @@ async def test_fixture_is_explicit_and_does_not_invent_policy():
             {"subject": "Test", "description": "Test"},
             [],
             "fixture",
+        )
+
+
+@respx.mock
+async def test_openai_adapter_parses_structured_output_without_storing_customer_content():
+    source = str(uuid4())
+    document = {"id": source, "title": "Delivery policy", "content": "Collect the order reference."}
+    route = respx.post("https://api.openai.com/v1/responses").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": "resp_test",
+                "object": "response",
+                "created_at": 1793000000,
+                "status": "completed",
+                "model": "gpt-4.1-mini-2025-04-14",
+                "output": [
+                    {
+                        "id": "msg_test",
+                        "type": "message",
+                        "status": "completed",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": json.dumps(sample_output(source_document_ids=[source])),
+                                "annotations": [],
+                            }
+                        ],
+                    }
+                ],
+                "parallel_tool_calls": False,
+                "tool_choice": "auto",
+                "tools": [],
+            },
+        )
+    )
+    result = await generate(
+        Settings(environment="test", llm_provider="openai", openai_api_key="synthetic-key"),
+        {"subject": "Invoice question", "description": "Please check my invoice."},
+        [document],
+        "gpt-4.1-mini-2025-04-14",
+    )
+    assert result.source_document_ids == [UUID(source)]
+    payload = json.loads(route.calls.last.request.content)
+    assert payload["store"] is False
+    assert payload["text"]["format"]["type"] == "json_schema"
+    assert payload["text"]["format"]["strict"] is True
+    assert payload["max_output_tokens"] == 2200
+
+
+@respx.mock
+async def test_openai_refusal_is_a_validation_failure():
+    respx.post("https://api.openai.com/v1/responses").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": "resp_refused",
+                "object": "response",
+                "created_at": 1793000000,
+                "status": "completed",
+                "model": "gpt-4.1-mini-2025-04-14",
+                "output": [
+                    {
+                        "id": "msg_refused",
+                        "type": "message",
+                        "status": "completed",
+                        "role": "assistant",
+                        "content": [{"type": "refusal", "refusal": "Cannot comply."}],
+                    }
+                ],
+                "parallel_tool_calls": False,
+                "tool_choice": "auto",
+                "tools": [],
+            },
+        )
+    )
+    with pytest.raises(InvalidOutput):
+        await generate(
+            Settings(environment="test", llm_provider="openai", openai_api_key="synthetic-key"),
+            {"subject": "Test refusal", "description": "A synthetic refusal case."},
+            [],
+            "gpt-4.1-mini-2025-04-14",
         )
 
 
