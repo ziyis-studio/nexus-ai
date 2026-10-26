@@ -1,0 +1,140 @@
+name: CI
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { version: '0.9.5', python-version: '3.12.14', enable-cache: true }
+      - run: uv sync --frozen
+      - run: uv run ruff format --check services tests scripts
+      - run: uv run ruff check services tests scripts
+      - run: uv run mypy --explicit-package-bases services/api/app services/worker
+      - run: uv run pytest --cov=app.services --cov=app.schemas --cov=app.repositories --cov=services.worker.ai --cov=services.worker.main --cov-fail-under=80 --cov-report=xml
+      - run: uv run python scripts/contract.py
+        env: { PYTHONPATH: 'services/api:.' }
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24.22.1', cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11
+        env: { POSTGRES_PASSWORD: nexus-local-only }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_TEST_URL: postgresql://postgres:nexus-local-only@127.0.0.1:5432/postgres
+      BENCHMARK_DATABASE_URL: postgresql://postgres:nexus-local-only@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24.22.1', cache: npm }
+      - uses: astral-sh/setup-uv@v6
+        with: { version: '0.9.5', python-version: '3.12.14' }
+      - run: npm ci --ignore-scripts
+      - run: uv sync --frozen
+      - run: node scripts/test-database.mjs
+      - run: node scripts/test-database.mjs --native
+      - run: uv run python scripts/benchmark.py
+      - uses: actions/upload-artifact@v4
+        with: { name: sql-performance, path: docs/evidence/sql-benchmark.json }
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11
+        env: { POSTGRES_PASSWORD: nexus-local-only }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:8.2.3-alpine
+        ports: ['6379:6379']
+        options: --health-cmd 'redis-cli ping' --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_TEST_URL: postgresql://postgres:nexus-local-only@127.0.0.1:5432/postgres
+      SANDBOX_DATABASE_URL: postgresql://postgres:nexus-local-only@127.0.0.1:5432/postgres
+      INTEGRATION_DATABASE_URL: postgresql://postgres:nexus-local-only@127.0.0.1:5432/postgres
+      SANDBOX_REDIS_URL: redis://127.0.0.1:6379/0
+      SANDBOX_FAKE_REDIS: 'false'
+      NEXUS_INTEGRATION: '1'
+      NUXT_PUBLIC_API_BASE: http://127.0.0.1:8000
+      NUXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sandbox-public-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24.22.1', cache: npm }
+      - uses: astral-sh/setup-uv@v6
+        with: { version: '0.9.5', python-version: '3.12.14' }
+      - run: npm ci --ignore-scripts
+      - run: uv sync --frozen
+      - run: node scripts/prepare-ci-db.mjs
+      - run: uv run python scripts/download-postgrest.py
+      - run: |
+          mkdir -p .local
+          uv run python scripts/sandbox_auth.py > .local/auth.log 2>&1 &
+          for i in {1..40}; do test -f .local/sandbox.json && break; sleep 1; done
+          uv run python scripts/sandbox-services.py > .local/services.log 2>&1 &
+          npm run dev > .local/web.log 2>&1 &
+          for i in {1..60}; do curl -fsS http://127.0.0.1:8000/health/ready && curl -fsS http://127.0.0.1:3000/login > /dev/null && break; sleep 2; done
+      - run: uv run pytest tests/integration -q
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: browser-traces, path: 'test-results/' }
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --env-file .env.example config --quiet
+      - run: docker build -f services/Dockerfile -t nexus-api:ci .
+      - run: docker build -f apps/web/Dockerfile -t nexus-web:ci .
+  supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:8.2.3-alpine
+        ports: ['6379:6379']
+        options: --health-cmd 'redis-cli ping' --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      NEXUS_REAL_SUPABASE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24.22.1', cache: npm }
+      - uses: astral-sh/setup-uv@v6
+        with: { version: '0.9.5', python-version: '3.12.14' }
+      - run: npm ci --ignore-scripts
+      - run: uv sync --frozen
+      - run: npx supabase start --exclude studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta,mailpit
+      - run: npx supabase db advisors --local --type security --level error --fail-on error
+      - run: npx supabase test db --local
+      - run: |
+          mkdir -p .local
+          npx supabase status -o json > .local/supabase-status.json
+          uv run python scripts/run-supabase-services.py > .local/real-services.log 2>&1 &
+          for i in {1..60}; do curl -fsS http://127.0.0.1:8000/health/ready && break; sleep 2; done
+      - run: uv run pytest tests/supabase -q
+      - run: npx supabase stop
+        if: always()

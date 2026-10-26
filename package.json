@@ -1,0 +1,31 @@
+{
+  "name": "nexus-ai",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/web",
+    "typecheck": "npm run typecheck --workspace apps/web",
+    "format": "prettier --write apps/web docs scripts/*.mjs .github README.md AGENTS.md playwright.config.ts package.json .prettierrc.json",
+    "format:check": "prettier --check apps/web docs scripts/*.mjs .github README.md AGENTS.md playwright.config.ts package.json .prettierrc.json",
+    "test:e2e": "playwright test",
+    "sandbox": "node scripts/sandbox.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.12",
+    "@electric-sql/pglite-socket": "0.2.15",
+    "@playwright/test": "1.64.1",
+    "embedded-postgres": "18.4.0-beta.17",
+    "pg": "8.23.1",
+    "prettier": "3.9.10",
+    "supabase": "2.122.0",
+    "typescript": "5.9.3",
+    "vue-tsc": "3.3.13"
+  },
+  "engines": {
+    "node": ">=24.22.1 <25"
+  }
+}

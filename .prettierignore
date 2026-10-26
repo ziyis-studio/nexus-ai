@@ -1,0 +1,9 @@
+docs/PRD.md
+docs/evidence/
+docs/screenshots/
+docs/demo/
+package-lock.json
+node_modules/
+**/node_modules/
+**/.nuxt/
+**/.output/

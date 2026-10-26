@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+.venv
+node_modules
+**/node_modules
+**/.nuxt
+**/.output
+.local
+**/__pycache__
+test-results
+playwright-report
+work

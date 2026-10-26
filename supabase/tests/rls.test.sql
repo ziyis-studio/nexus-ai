@@ -1,0 +1,15 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(10);
+select ok((select bool_and(relrowsecurity) from pg_class c join pg_namespace n on c.relnamespace=n.oid where n.nspname='public' and c.relkind='r'),'All public tables have RLS');
+select ok(not has_table_privilege('anon','public.tickets','SELECT'),'Anonymous has no ticket SELECT');
+select ok(not has_table_privilege('authenticated','public.tickets','DELETE'),'Authenticated has no ticket DELETE');
+select ok(not has_table_privilege('authenticated','public.analysis_runs','INSERT'),'No direct run INSERT');
+select ok(not has_table_privilege('authenticated','public.ai_results','UPDATE'),'No direct result UPDATE');
+select ok(not has_schema_privilege('anon','nexus_private','USAGE'),'Private schema hidden from anon');
+select ok(not has_function_privilege('anon','public.create_analysis(uuid,uuid,text,text)','EXECUTE'),'Anonymous cannot enqueue');
+select ok(not has_function_privilege('authenticated','nexus_private.audit_change()','EXECUTE'),'Audit trigger cannot be called as an API');
+select ok(not (select rolbypassrls from pg_roles where rolname='nexus_worker'),'Worker does not bypass RLS');
+select ok(not has_table_privilege('nexus_worker','public.memberships','UPDATE'),'Worker cannot grant membership');
+select * from finish();
+rollback;
