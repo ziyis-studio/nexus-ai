@@ -66,7 +66,7 @@ export const useRunWatch = (tid: string, onUpdate: (run: Run) => Promise<void>) 
       }
       socket.onclose = (event) => {
         if (disposed || current !== generation) return
-        if ([4401, 4403].includes(event.code)) {
+        if (event.code === 4403) {
           connection.value = 'unauthorized'
           stop()
           return

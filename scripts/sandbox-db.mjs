@@ -1,6 +1,6 @@
 // Portable QA harness. Real native PostgreSQL + schema shim, NOT Supabase Auth.
 import EmbeddedPostgres from 'embedded-postgres'
-import { mkdir, readFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { shim, migrate, seed, ids } from './test-database.mjs'
 
@@ -26,7 +26,8 @@ const db = pg.getPgClient()
 await db.connect()
 const query = (sql, params) => db.query(sql, params)
 const adapter = { exec: (sql) => db.query(sql), query }
-if (!(await query("select 1 from pg_namespace where nspname='nexus_private'")).rowCount) {
+const fresh = !(await query("select 1 from pg_namespace where nspname='nexus_private'")).rowCount
+if (fresh) {
   await adapter.exec(shim)
   await migrate(adapter)
   await seed(adapter)
@@ -66,6 +67,29 @@ if (!(await query("select 1 from pg_namespace where nspname='nexus_private'")).r
         ids.admin,
       ],
     )
+}
+// Persisted previews need later migrations too. Early previews without history
+// already contain the baseline; record it and apply subsequent migrations once.
+const migrations = (await readdir('supabase/migrations')).filter((name) => name.endsWith('.sql')).sort()
+await query('create table if not exists nexus_private.sandbox_migrations(name text primary key)')
+let applied = (await query('select name from nexus_private.sandbox_migrations')).rows.map((row) => row.name)
+if (!applied.length) {
+  for (const name of fresh ? migrations : migrations.slice(0, 1))
+    await query('insert into nexus_private.sandbox_migrations(name) values($1) on conflict do nothing', [
+      name,
+    ])
+  applied = fresh ? migrations : migrations.slice(0, 1)
+}
+for (const name of migrations.filter((name) => !applied.includes(name))) {
+  await query('begin')
+  try {
+    await query(await readFile('supabase/migrations/' + name, 'utf8'))
+    await query('insert into nexus_private.sandbox_migrations(name) values($1)', [name])
+    await query('commit')
+  } catch (error) {
+    await query('rollback')
+    throw error
+  }
 }
 console.log('Native PostgreSQL QA database ready on 127.0.0.1:55432')
 await db.end()

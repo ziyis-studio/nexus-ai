@@ -43,8 +43,8 @@ try:
         """insert into public.tickets(tenant_id,subject,description,status,priority,created_by,created_at)
       select case when n%%2=0 then %s::uuid else %s::uuid end,'Synthetic ticket '||n,
       'Synthetic delivery request for repeatable SQL performance validation.',
-      (array['open','in_progress','resolved','closed'])[1+(n%%4)],
-      (array['normal','high','urgent','low'])[1+(n%%4)],%s,now()-n*interval '1 second' from generate_series(1,10000)n""",
+      (array['open','in_progress','resolved','closed'])[1+((n/2)%%4)],
+      (array['normal','high','urgent','low'])[1+((n/2)%%4)],%s,now()-n*interval '1 second' from generate_series(1,10000)n""",
         (a, b, user),
     )
     db.execute(
@@ -93,19 +93,27 @@ try:
             "samples": len(values),
         }
 
-    measurements = {key: measure(db, *value) for key, value in queries.items()}
-    plans = {
-        key: db.execute("explain(analyze,buffers,format json) " + query, args).fetchone()[0]
-        for key, (query, args) in queries.items()
-    }
+    def actor(connection, role="authenticated"):
+        connection.execute(sql.SQL("set role {}").format(sql.Identifier(role)))
+        connection.execute("select set_config('request.jwt.claim.sub',%s,false)", (str(user),))
+
+    measurements, plans = {}, {}
+    for key, (query, args) in queries.items():
+        actor(db, "nexus_worker" if key == "knowledge_retrieval" else "authenticated")
+        measurements[key] = measure(db, query, args)
+        plans[key] = db.execute("explain(analyze,buffers,format json) " + query, args).fetchone()[0]
+    db.execute("reset role")
     db.execute("drop index public.tickets_status_page")
+    actor(db)
     before = db.execute(
         "explain(analyze,buffers,format json) " + queries["status_filter"][0],
         queries["status_filter"][1],
     ).fetchone()[0]
+    db.execute("reset role")
     db.execute(
         "create index tickets_status_page on public.tickets(tenant_id,status,created_at desc,id desc)"
     )
+    actor(db)
     after = db.execute(
         "explain(analyze,buffers,format json) " + queries["status_filter"][0],
         queries["status_filter"][1],
@@ -113,6 +121,7 @@ try:
 
     def concurrent_sample(_):
         with psycopg.connect(**kwargs) as connection:
+            actor(connection)
             return measure(connection, *queries["ticket_list"])
 
     with ThreadPoolExecutor(max_workers=10) as pool:
@@ -127,6 +136,7 @@ try:
             "cpu_count": os.cpu_count(),
             "transport": "loopback native PostgreSQL",
             "auth": "synthetic auth schema; not hosted Supabase",
+            "query_roles": "authenticated with membership RLS; knowledge retrieval uses restricted nexus_worker",
         },
         "tickets": 10000,
         "tenants": 2,

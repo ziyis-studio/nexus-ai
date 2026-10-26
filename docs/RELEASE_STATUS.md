@@ -13,18 +13,20 @@ Implementation candidate for PRD P0. This document distinguishes source completi
 
 ## Local evidence
 
-- 72 backend tests passed; selected business modules 84.52% coverage.
-- 27 RLS/grant/constraint scenarios passed on both WASM PostgreSQL and native PostgreSQL 18.4.
+- 74 backend tests passed; selected business modules 85.19% coverage. The OpenAI SDK adapter was exercised against mocked structured-output and refusal responses.
+- 28 RLS/grant/constraint scenarios passed on both WASM PostgreSQL and native PostgreSQL 18.4.
 - 3 real PostgreSQL/PostgREST/API persistence/isolation integration scenarios passed.
-- Complete browser workflow, Viewer restrictions, knowledge management and mobile/session/keyboard scenarios implemented; final rerun recorded with the release commit.
+- 5 browser journeys passed: full workflow/tenant switch, Viewer restrictions, knowledge management/audit, mobile/session/keyboard/logout, and replay after a network interruption following analysis acceptance.
 - Nuxt production build and frontend typecheck passed.
 - SQL benchmark used 10,000 tickets and 10 concurrent native database clients; raw measured plans retained.
 - Runtime npm dependency audit: zero findings. Development node-forge advisory remains documented in SECURITY.md.
 
-## Pending external gates
+## CI verification
 
-- GitHub Actions final execution and Docker image builds: tracked on the implementation pull request.
-- Actual local Supabase Auth/pgTAP/advisor pipeline: provided as a separate CI job; no hosted result is inferred from the portable auth harness.
+All six jobs passed for application commit [`e3e7fef`](https://github.com/ziyis-studio/nexus-ai/actions/runs/40397925356): backend, web, native database, real Redis integration/browser tests, Docker builds, and real local Supabase. Supabase pgTAP reported 10 passing grant/RLS checks; security advisors passed the error-level gate; the real Auth-to-worker-to-review and logout/revoked-session scenario passed. Later documentation/benchmark/preview updates are rechecked on the PR before merge.
+
+## Remaining staging configuration
+
 - Hosted Supabase provisioning, real-account cloud sign-in and revocation, production WSS/origin configuration, a real OpenAI inference and deployed performance measurements require owner-selected infrastructure and secrets.
 - Upstream development TLS dependency advisory requires continued review. The P0 production acceptance gate is not declared passed while this remains unresolved.
 

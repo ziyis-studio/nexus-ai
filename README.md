@@ -87,4 +87,4 @@ Browser tests need the running test environment and Chromium (`npx playwright in
 
 ## Delivery status
 
-P0 source and runnable review environment are implemented. Production acceptance remains conditional on CI/Supabase staging verification, a real configured OpenAI call and review of the documented upstream development-tooling advisory. No hosted production deployment or live-account model inference is implied by fixture tests. See the release status for the precise evidence.
+P0 source and runnable review environment are implemented. All six CI jobs passed, including real local Supabase Auth, real Redis, native PostgreSQL and Docker builds. Hosted production acceptance still requires owner configuration, a real OpenAI call and review of the documented upstream development-tooling advisory. No hosted production deployment or live-account model inference is implied by fixture tests. See the release status for the precise evidence.

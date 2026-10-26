@@ -95,7 +95,7 @@ async def test_fixture_is_explicit_and_does_not_invent_policy():
 
 
 @respx.mock
-async def test_openai_adapter_parses_structured_output_without_storing_customer_content():
+async def test_openai_adapter_uses_structured_output_and_disables_response_storage():
     source = str(uuid4())
     document = {"id": source, "title": "Delivery policy", "content": "Collect the order reference."}
     route = respx.post("https://api.openai.com/v1/responses").mock(
