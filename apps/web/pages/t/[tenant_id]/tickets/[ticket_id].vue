@@ -1,4 +1,20 @@
 <script setup lang="ts">
+import {
+  Activity,
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Check,
+  ChevronRight,
+  Copy,
+  FileText,
+  MessageSquare,
+  Pencil,
+  ShieldCheck,
+  Sparkles,
+  X,
+} from '@lucide/vue'
 import type { Ticket, Run, Page, AIResult, Knowledge, TicketStatus, Priority } from '~/types'
 const route = useRoute()
 const tid = String(route.params.tenant_id)
@@ -189,239 +205,351 @@ onBeforeUnmount(() => {
   disposed = true
   selectionVersion++
 })
+
+const resultTab = ref('draft')
+const rejectConfirm = ref(false)
+const editTicket = () => {
+  if (!ticket.value) return
+  Object.assign(form, {
+    subject: ticket.value.subject,
+    description: ticket.value.description,
+    priority: ticket.value.priority,
+    status: ticket.value.status,
+  })
+  actionError.value = ''
+  editing.value = true
+}
+const retryResult = () => {
+  actionError.value = ''
+  if (selectedRun.value) void loadResult(selectedRun.value)
+}
+const chooseRun = (value: unknown) => {
+  const run = runs.value.find((item) => item.id === value)
+  if (run) {
+    actionError.value = ''
+    resultTab.value = 'draft'
+    void loadResult(run)
+  }
+}
 </script>
 <template>
   <div>
-    <NuxtLink :to="`/t/${tid}/tickets`" class="back-link"
-      ><NIcon name="ArrowLeft" :size="16" />All tickets</NuxtLink
-    ><ViewState :loading="loading" :error="error" @retry="load" /><template
-      v-if="ticket && !loading && !error"
-      ><AppHeader
-        :eyebrow="`TICKET / ${ticket.id.slice(0, 8).toUpperCase()}`"
+    <UiButton as-child variant="ghost" size="sm" class="mb-5"
+      ><NuxtLink :to="'/t/' + tid + '/tickets'"
+        ><ArrowLeft data-icon="inline-start" />All tickets</NuxtLink
+      ></UiButton
+    >
+    <ViewState :loading="loading" :error="error" @retry="load" />
+    <template v-if="ticket && !loading && !error">
+      <AppHeader
+        :eyebrow="'Ticket / ' + ticket.id.slice(0, 8)"
         :title="ticket.subject"
-        :description="`Created ${date(ticket.created_at)} · ${ticket.customer_name || ticket.customer_email || 'Customer not specified'}`"
-        ><button v-if="canWrite" class="btn" @click="editing = !editing">
-          <NIcon name="Settings" :size="16" />{{ editing ? 'Cancel editing' : 'Edit ticket' }}
-        </button></AppHeader
+        :description="'Created ' + date(ticket.created_at)"
+        ><UiButton v-if="canWrite" variant="outline" @click="editTicket"
+          ><Pencil data-icon="inline-start" />Edit ticket</UiButton
+        ></AppHeader
       >
-      <p v-if="actionError" class="alert-error" role="alert">{{ actionError }}</p>
-      <div class="detail-grid">
-        <div class="detail-main">
-          <section class="panel conversation-panel">
-            <div class="panel-heading">
-              <h2><NIcon name="Inbox" />Conversation</h2>
-              <StatusBadge :value="ticket.status" />
-            </div>
-            <form v-if="editing" class="stack-form padded" @submit.prevent="save">
-              <label for="edit-subject">Subject</label
-              ><input id="edit-subject" v-model="form.subject" minlength="3" maxlength="200" required /><label
-                for="edit-description"
-                >Message</label
-              ><textarea
-                id="edit-description"
-                v-model="form.description"
-                rows="8"
-                minlength="10"
-                maxlength="10000"
-                required
+      <UiAlert v-if="actionError" variant="destructive" class="mb-5" role="alert"
+        ><AlertCircle /><UiAlertTitle>We couldn’t complete that action</UiAlertTitle
+        ><UiAlertDescription>{{ actionError }}</UiAlertDescription></UiAlert
+      >
+      <div class="ticket-detail">
+        <div class="detail-column">
+          <UiCard
+            ><UiCardHeader
+              ><div class="flex items-center justify-between gap-3">
+                <UiCardTitle><h2>Customer message</h2></UiCardTitle
+                ><StatusBadge :value="ticket.status" /></div
+            ></UiCardHeader>
+            <UiCardContent class="flex flex-col gap-6">
+              <div class="flex items-center gap-3">
+                <UiAvatar class="size-10"
+                  ><UiAvatarFallback>{{
+                    (ticket.customer_name || ticket.customer_email || '?').slice(0, 2).toUpperCase()
+                  }}</UiAvatarFallback></UiAvatar
+                >
+                <div class="flex min-w-0 flex-col gap-1">
+                  <strong class="truncate text-sm font-medium">{{
+                    ticket.customer_name || 'Customer'
+                  }}</strong
+                  ><span class="truncate text-xs text-muted-foreground">{{
+                    ticket.customer_email || 'Support request'
+                  }}</span>
+                </div>
+              </div>
+              <article class="message-text">{{ ticket.description }}</article> </UiCardContent
+            ><UiCardFooter class="justify-between gap-3"
+              ><span class="text-xs text-muted-foreground">Last updated {{ date(ticket.updated_at) }}</span
+              ><StatusBadge :value="ticket.priority"
+            /></UiCardFooter>
+          </UiCard>
+          <UiCard
+            ><UiCardHeader
+              ><div class="flex items-center justify-between gap-3">
+                <UiCardTitle><h2>Analysis history</h2></UiCardTitle
+                ><UiBadge variant="secondary">{{ runs.length }}</UiBadge>
+              </div>
+              <UiCardDescription>Select a run to review its saved result.</UiCardDescription></UiCardHeader
+            >
+            <UiCardContent>
+              <ViewState
+                :empty="!runs.length"
+                title="No analyses yet"
+                description="Your first analysis will appear here."
               />
-              <div class="form-columns">
-                <div>
-                  <label for="edit-status">Status</label
-                  ><select id="edit-status" v-model="form.status">
-                    <option v-for="status in transitions" :key="status" :value="status">
-                      {{ status.replaceAll('_', ' ') }}
-                    </option>
-                  </select>
-                </div>
-                <div>
-                  <label for="edit-priority">Priority</label
-                  ><select id="edit-priority" v-model="form.priority">
-                    <option v-for="p in ['low', 'normal', 'high', 'urgent']" :key="p">{{ p }}</option>
-                  </select>
-                </div>
-              </div>
-              <button class="btn btn-primary" :disabled="saving">
-                {{ saving ? 'Saving…' : 'Save changes' }}
-              </button>
-            </form>
-            <div v-else class="conversation-body">
-              <div class="message-sender">
-                <span class="customer-avatar large">{{ (ticket.customer_name || '?').slice(0, 1) }}</span
-                ><span
-                  ><strong>{{ ticket.customer_name || 'Customer' }}</strong
-                  ><small>{{ ticket.customer_email || 'Support request' }}</small></span
-                ><time>{{ date(ticket.created_at) }}</time>
-              </div>
-              <div class="message-content">{{ ticket.description }}</div>
-            </div>
-            <div class="ticket-metadata">
-              <span>Priority <StatusBadge :value="ticket.priority" /></span
-              ><span>Updated {{ date(ticket.updated_at) }}</span>
-            </div>
-          </section>
-          <section class="panel history-panel">
-            <div class="panel-heading">
-              <h2><NIcon name="Activity" />Analysis history</h2>
-              <span class="count-label">{{ runs.length }}</span>
-            </div>
-            <ViewState
-              :empty="!runs.length"
-              title="The next step is yours."
-              description="Run an analysis to see structured insights and a grounded response draft."
-            /><button
-              v-for="run in runs"
-              :key="run.id"
-              class="history-row"
-              :class="{ selected: selectedRun?.id === run.id }"
-              @click="loadResult(run)"
-            >
-              <span class="history-icon"><NIcon name="Sparkles" :size="16" /></span
-              ><span
-                ><strong>{{ date(run.created_at) }}</strong
-                ><small
-                  >{{ run.model_id }} · {{ run.attempt_count }} attempt{{
-                    run.attempt_count !== 1 ? 's' : ''
-                  }}</small
-                ></span
-              ><StatusBadge :value="run.status" /><NIcon name="ChevronRight" :size="16" /></button
-            ><button v-if="runCursor" class="btn history-more" :disabled="historyBusy" @click="loadHistory">
-              {{ historyBusy ? 'Loading…' : 'Load older analyses' }}
-            </button>
-          </section>
+              <UiToggleGroup
+                v-if="runs.length"
+                type="single"
+                orientation="vertical"
+                :spacing="1"
+                :model-value="selectedRun?.id"
+                class="w-full"
+                aria-label="Select analysis"
+                @update:model-value="chooseRun"
+              >
+                <UiToggleGroupItem
+                  v-for="run in runs"
+                  :key="run.id"
+                  :value="run.id"
+                  class="h-auto w-full justify-between gap-3 p-3"
+                  ><span class="flex min-w-0 flex-col gap-1 text-left"
+                    ><span>{{ date(run.created_at) }}</span
+                    ><span class="truncate text-xs text-muted-foreground"
+                      >{{ run.model_id === 'fixture' ? 'Demo provider' : run.model_id }} ·
+                      {{ run.attempt_count }} attempt{{ run.attempt_count === 1 ? '' : 's' }}</span
+                    ></span
+                  ><StatusBadge :value="run.status"
+                /></UiToggleGroupItem>
+              </UiToggleGroup>
+              <UiButton
+                v-if="runCursor"
+                variant="outline"
+                class="mt-4 w-full"
+                :disabled="historyBusy"
+                @click="loadHistory"
+                ><UiSpinner v-if="historyBusy" data-icon="inline-start" />{{
+                  historyBusy ? 'Loading…' : 'Load older analyses'
+                }}</UiButton
+              >
+            </UiCardContent>
+          </UiCard>
         </div>
-        <aside class="ai-workspace panel">
-          <div class="ai-workspace-header">
-            <div>
-              <span class="ai-star"><NIcon name="Sparkles" :size="20" /></span>
-              <h2>Intelligence workspace</h2>
+        <UiCard>
+          <UiCardHeader
+            ><div class="flex flex-wrap items-center justify-between gap-3">
+              <UiCardTitle
+                ><h2 class="flex items-center gap-2">
+                  <Sparkles class="size-4 text-primary" />AI workspace
+                </h2></UiCardTitle
+              ><StatusBadge v-if="result" :value="result.review_status" /><StatusBadge
+                v-else-if="selectedRun"
+                :value="selectedRun.status"
+              /><UiBadge v-else variant="outline">Ready to analyze</UiBadge>
             </div>
-            <span class="ai-label">{{
-              selectedRun?.model_id === 'fixture' ? 'DEV FIXTURE' : 'NEXUS AI'
-            }}</span>
-          </div>
-          <div class="ai-body">
-            <template v-if="!selectedRun"
-              ><span class="ai-hero-symbol"><NIcon name="Sparkles" :size="30" /></span>
-              <h3>A second perspective.<br />A clearer next step.</h3>
-              <p>
-                Analyze this conversation to surface its intent, urgency, and a draft grounded in your team’s
-                knowledge.
-              </p>
-              <div class="ai-capabilities">
-                <span><NIcon name="Check" :size="14" />Structured classification</span
-                ><span><NIcon name="Check" :size="14" />Tenant-specific knowledge</span
-                ><span><NIcon name="Check" :size="14" />Always reviewed by a human</span>
-              </div></template
+            <UiCardDescription>{{
+              selectedRun?.model_id === 'fixture'
+                ? 'Demo analysis · deterministic preview output'
+                : 'Grounded in your knowledge. Reviewed by your team.'
+            }}</UiCardDescription></UiCardHeader
+          >
+          <UiCardContent class="flex flex-col gap-6">
+            <UiEmpty v-if="!selectedRun" class="py-12"
+              ><UiEmptyHeader
+                ><UiEmptyMedia variant="icon"><Sparkles /></UiEmptyMedia
+                ><UiEmptyTitle>A clearer next reply.</UiEmptyTitle
+                ><UiEmptyDescription
+                  >Find the intent, urgency, and relevant knowledge behind this conversation. Get a structured
+                  analysis and a response draft to review.</UiEmptyDescription
+                ></UiEmptyHeader
+              ></UiEmpty
             >
-            <div
+            <UiEmpty
               v-else-if="['queued', 'processing'].includes(selectedRun.status)"
-              class="analysis-progress"
+              class="py-10"
               role="status"
-            >
-              <span class="spinner" />
-              <h3>
-                {{ selectedRun.status === 'queued' ? 'In the queue' : 'Making sense of the conversation' }}
-              </h3>
-              <p>
-                {{
+              ><UiEmptyHeader
+                ><UiEmptyMedia variant="icon"><UiSpinner /></UiEmptyMedia
+                ><UiEmptyTitle>{{
+                  selectedRun.status === 'queued'
+                    ? 'Your analysis is queued'
+                    : 'Working through the conversation'
+                }}</UiEmptyTitle
+                ><UiEmptyDescription>{{
                   watcher.stage.value === 'retrieving'
-                    ? 'Finding relevant knowledge…'
+                    ? 'Finding relevant knowledge for this request…'
                     : watcher.stage.value === 'retrying'
-                      ? 'Provider temporarily unavailable. Retrying…'
-                      : 'Preparing a structured analysis and response draft…'
-                }}
-              </p>
-              <span class="engine-pill">{{
-                watcher.connection.value === 'connected'
-                  ? 'Live updates connected'
-                  : 'Reconnecting · checking saved status'
-              }}</span>
-            </div>
-            <div v-else-if="selectedRun.status === 'failed'" class="analysis-failed">
-              <NIcon name="AlertCircle" :size="28" />
-              <h3>Analysis couldn’t be completed</h3>
-              <p>{{ selectedRun.error_message }}</p>
-              <code>{{ selectedRun.error_code }}</code>
-              <p>Your ticket is saved. Start a new run to try again.</p>
-            </div>
-            <template v-if="result"
-              ><div class="insight-grid">
-                <div>
-                  <span class="card-label">Category</span><strong>{{ result.category }}</strong>
-                </div>
-                <div>
-                  <span class="card-label">Suggested priority</span
-                  ><StatusBadge :value="result.suggested_priority" />
-                </div>
-                <div>
-                  <span class="card-label">Sentiment</span><strong>{{ result.sentiment }}</strong>
-                </div>
-                <div><span class="card-label">Review</span><StatusBadge :value="result.review_status" /></div>
-              </div>
-              <div class="ai-section">
-                <h3>At a glance</h3>
-                <p>{{ result.summary }}</p>
-              </div>
-              <div class="ai-section">
-                <h3>
-                  Suggested response
-                  <button class="icon-btn" aria-label="Copy suggested response" @click="copy">
-                    <NIcon name="Copy" :size="15" />
-                  </button>
+                      ? 'The AI provider is temporarily unavailable. Retrying…'
+                      : 'Preparing insights and a response draft…'
+                }}</UiEmptyDescription></UiEmptyHeader
+              ><UiEmptyContent
+                ><UiBadge variant="secondary">{{
+                  watcher.connection.value === 'connected'
+                    ? 'Live updates connected'
+                    : 'Checking saved progress'
+                }}</UiBadge></UiEmptyContent
+              ></UiEmpty
+            >
+            <UiAlert v-else-if="selectedRun.status === 'failed'" variant="destructive"
+              ><AlertCircle /><UiAlertTitle>Analysis couldn’t be completed</UiAlertTitle
+              ><UiAlertDescription
+                >{{ selectedRun.error_message || 'The analysis could not finish. Your ticket is saved.'
+                }}<code v-if="selectedRun.error_code" class="mt-2 block text-xs">{{
+                  selectedRun.error_code
+                }}</code>
+                <p class="mt-2">Start a new analysis to try again.</p></UiAlertDescription
+              ></UiAlert
+            >
+            <ViewState v-else-if="!result && !actionError" loading />
+            <UiButton
+              v-if="selectedRun?.status === 'succeeded' && !result && actionError"
+              variant="outline"
+              @click="retryResult"
+              >Retry loading result</UiButton
+            >
+            <template v-if="result">
+              <UiTabs v-model="resultTab" class="flex flex-col gap-5">
+                <UiTabsList variant="line"
+                  ><UiTabsTrigger value="draft"><MessageSquare />Response</UiTabsTrigger
+                  ><UiTabsTrigger value="insights"><Activity />Insights</UiTabsTrigger></UiTabsList
+                >
+                <UiTabsContent value="draft" class="flex flex-col gap-5">
+                  <div class="flex flex-col gap-2">
+                    <h3 class="text-xs font-medium text-muted-foreground">Summary</h3>
+                    <p class="text-sm leading-7">{{ result.summary }}</p>
+                  </div>
+                  <div class="flex items-center justify-between gap-3">
+                    <h3 class="text-sm font-medium">Suggested response</h3>
+                    <UiTooltip
+                      ><UiTooltipTrigger as-child
+                        ><UiButton
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Copy suggested response"
+                          @click="copy"
+                          ><Copy /></UiButton></UiTooltipTrigger
+                      ><UiTooltipContent>Copy draft</UiTooltipContent></UiTooltip
+                    >
+                  </div>
+                  <article class="draft-surface" aria-label="Suggested response draft">
+                    {{ result.suggested_reply }}
+                  </article>
+                  <p class="flex items-center gap-2 text-xs text-muted-foreground">
+                    <ShieldCheck class="size-3.5 shrink-0" />AI-generated draft. Check it before use.
+                  </p>
+                </UiTabsContent>
+                <UiTabsContent value="insights" class="flex flex-col gap-5">
+                  <dl class="insight-grid">
+                    <div>
+                      <dt class="text-xs text-muted-foreground">Category</dt>
+                      <dd class="m-0 text-sm font-medium capitalize">{{ result.category }}</dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-muted-foreground">Suggested priority</dt>
+                      <dd class="m-0"><StatusBadge :value="result.suggested_priority" /></dd>
+                    </div>
+                    <div>
+                      <dt class="text-xs text-muted-foreground">Sentiment</dt>
+                      <dd class="m-0 text-sm font-medium capitalize">{{ result.sentiment }}</dd>
+                    </div>
+                  </dl>
+                  <div class="flex flex-col gap-2">
+                    <h3 class="text-sm font-medium">Decision rationale</h3>
+                    <p class="text-sm leading-7 text-muted-foreground">{{ result.reasoning_summary }}</p>
+                  </div>
+                </UiTabsContent>
+              </UiTabs>
+              <UiSeparator />
+              <section class="flex flex-col gap-3" aria-labelledby="supporting-knowledge">
+                <h3 id="supporting-knowledge" class="flex items-center gap-2 text-sm font-medium">
+                  <BookOpen class="size-4" />Supporting knowledge<UiBadge variant="secondary">{{
+                    sources.length
+                  }}</UiBadge>
                 </h3>
-                <div class="reply-draft">{{ result.suggested_reply }}</div>
-                <span class="draft-caption">DRAFT · HUMAN REVIEW REQUIRED · NEVER AUTO-SENT</span>
-              </div>
-              <div class="ai-section">
-                <h3>
-                  Supporting knowledge <span class="count-label">{{ sources.length }}</span>
-                </h3>
-                <p v-if="!sources.length" class="muted">
-                  No supporting documents. Verify business or policy claims before use.
-                </p>
-                <NuxtLink
+                <UiButton
                   v-for="source in sources"
                   :key="source.id"
-                  :to="`/t/${tid}/knowledge?document=${source.id}`"
-                  class="source-link"
-                  ><NIcon name="FileText" :size="16" /><span
-                    >{{ source.title
-                    }}<small v-if="!source.is_active">Archived since this analysis</small></span
-                  ><NIcon name="ArrowUpRight" :size="15"
-                /></NuxtLink>
-                <p v-if="sourceErrors.length" class="form-error">
-                  Some original references are unavailable. Verify them with an administrator.
+                  as-child
+                  variant="outline"
+                  class="h-auto w-full justify-between gap-3 p-3"
+                  ><NuxtLink :to="'/t/' + tid + '/knowledge?document=' + source.id"
+                    ><FileText data-icon="inline-start" /><span
+                      class="flex min-w-0 flex-1 flex-col gap-1 text-left"
+                      ><span class="truncate">{{ source.title }}</span
+                      ><span v-if="!source.is_active" class="text-xs text-muted-foreground"
+                        >Archived since this analysis</span
+                      ></span
+                    ><ArrowRight data-icon="inline-end" /></NuxtLink
+                ></UiButton>
+                <p
+                  v-if="result.source_document_ids.length && !sources.length && !sourceErrors.length"
+                  class="text-xs text-muted-foreground"
+                  role="status"
+                >
+                  Loading supporting knowledge…
                 </p>
-              </div>
-              <details class="reasoning">
-                <summary>Decision rationale</summary>
-                <p>{{ result.reasoning_summary }}</p>
-              </details>
-              <div v-if="result.review_status === 'pending' && canWrite" class="review-actions">
-                <button class="btn" :disabled="reviewing" @click="review('reject')">
-                  <NIcon name="X" :size="16" />Reject</button
-                ><button class="btn btn-primary" :disabled="reviewing" @click="review('approve')">
-                  <NIcon name="Check" :size="16" />{{ reviewing ? 'Saving…' : 'Approve draft' }}
-                </button>
-              </div>
-              <p v-if="result.review_status !== 'pending'" class="review-final">
-                <NIcon name="ShieldCheck" :size="16" />{{
-                  result.review_status === 'approved'
-                    ? 'Approved for use. No message has been sent.'
-                    : 'Rejected. Start a new analysis for another suggestion.'
-                }}<small v-if="result.reviewed_at">Reviewed {{ date(result.reviewed_at) }}</small>
-              </p></template
+                <UiAlert v-if="!result.source_document_ids.length"
+                  ><UiAlertTitle>Verify policy claims before use</UiAlertTitle
+                  ><UiAlertDescription
+                    >No supporting documents were cited for this response.</UiAlertDescription
+                  ></UiAlert
+                >
+                <UiAlert v-if="sourceErrors.length"
+                  ><UiAlertTitle>Some references are unavailable</UiAlertTitle
+                  ><UiAlertDescription
+                    >Ask an administrator to verify the original documents before using this
+                    draft.</UiAlertDescription
+                  ></UiAlert
+                >
+              </section>
+              <UiAlert v-if="result.review_status !== 'pending'"
+                ><ShieldCheck /><UiAlertTitle>{{
+                  result.review_status === 'approved' ? 'Draft approved' : 'Draft rejected'
+                }}</UiAlertTitle
+                ><UiAlertDescription
+                  >{{
+                    result.review_status === 'approved'
+                      ? 'Approved for use. No message has been sent.'
+                      : 'Rejected. Start a new analysis for another suggestion.'
+                  }}<span v-if="result.reviewed_at" class="mt-2 block text-xs"
+                    >Reviewed {{ date(result.reviewed_at) }}</span
+                  ></UiAlertDescription
+                ></UiAlert
+              >
+            </template>
+            <UiAlert v-if="!canWrite"
+              ><ShieldCheck /><UiAlertTitle>Read-only access</UiAlertTitle
+              ><UiAlertDescription
+                >You can view analyses. An agent or administrator can run and review
+                drafts.</UiAlertDescription
+              ></UiAlert
             >
-          </div>
-          <div class="ai-workspace-footer">
-            <button
+          </UiCardContent>
+          <UiCardFooter class="flex-col items-stretch gap-4">
+            <template v-if="result?.review_status === 'pending' && canWrite"
+              ><div class="flex gap-2">
+                <UiButton variant="outline" class="flex-1" :disabled="reviewing" @click="rejectConfirm = true"
+                  ><X data-icon="inline-start" />Reject</UiButton
+                ><UiButton class="flex-1" :disabled="reviewing" @click="review('approve')"
+                  ><UiSpinner v-if="reviewing" data-icon="inline-start" /><Check
+                    v-else
+                    data-icon="inline-start"
+                  />{{ reviewing ? 'Saving…' : 'Approve draft' }}</UiButton
+                >
+              </div>
+              <p class="text-center text-xs text-muted-foreground">
+                The decision is final for this draft. No message will be sent.
+              </p>
+              <UiSeparator
+            /></template>
+            <UiButton
               v-if="canWrite"
-              class="btn btn-primary analyze-button"
+              :variant="result ? 'outline' : 'default'"
               :disabled="analyzing || active"
+              class="w-full"
               @click="analyze"
-            >
-              <NIcon name="Sparkles" :size="17" />{{
+              ><UiSpinner v-if="analyzing || active" data-icon="inline-start" /><Sparkles
+                v-else
+                data-icon="inline-start" />{{
                 analyzing
                   ? 'Submitting…'
                   : active
@@ -429,12 +557,88 @@ onBeforeUnmount(() => {
                     : selectedRun
                       ? 'Run a new analysis'
                       : 'Analyze with AI'
-              }}<NIcon name="ArrowRight" :size="16" />
-            </button>
-            <p><NIcon name="ShieldCheck" :size="13" />AI suggests. You decide.</p>
-          </div>
-        </aside>
-      </div></template
-    >
+              }}<ArrowRight v-if="!analyzing && !active" data-icon="inline-end"
+            /></UiButton>
+          </UiCardFooter>
+        </UiCard>
+      </div>
+      <AppModal
+        v-model:open="editing"
+        title="Edit ticket"
+        description="Update the conversation, priority, or status."
+        :busy="saving"
+        wide
+      >
+        <form class="flex flex-col gap-6" @submit.prevent="save">
+          <UiFieldGroup>
+            <UiField
+              ><UiFieldLabel for="edit-subject">Subject</UiFieldLabel
+              ><UiInput
+                id="edit-subject"
+                v-model="form.subject"
+                minlength="3"
+                maxlength="200"
+                required
+                :disabled="saving"
+            /></UiField>
+            <UiField
+              ><UiFieldLabel for="edit-description">Message</UiFieldLabel
+              ><UiTextarea
+                id="edit-description"
+                v-model="form.description"
+                rows="7"
+                minlength="10"
+                maxlength="10000"
+                required
+                :disabled="saving"
+            /></UiField>
+            <UiFieldGroup class="sm:flex-row"
+              ><UiField
+                ><UiFieldLabel for="edit-status">Status</UiFieldLabel
+                ><UiNativeSelect id="edit-status" v-model="form.status" class="w-full" :disabled="saving"
+                  ><option v-for="choice in transitions" :key="choice" :value="choice">
+                    {{ choice.replaceAll('_', ' ') }}
+                  </option></UiNativeSelect
+                ></UiField
+              ><UiField
+                ><UiFieldLabel for="edit-priority">Priority</UiFieldLabel
+                ><UiNativeSelect id="edit-priority" v-model="form.priority" class="w-full" :disabled="saving"
+                  ><option v-for="p in ['low', 'normal', 'high', 'urgent']" :key="p" :value="p">
+                    {{ p }}
+                  </option></UiNativeSelect
+                ></UiField
+              ></UiFieldGroup
+            > </UiFieldGroup
+          ><UiAlert v-if="actionError" variant="destructive" role="alert"
+            ><UiAlertTitle>Ticket not saved</UiAlertTitle
+            ><UiAlertDescription>{{ actionError }}</UiAlertDescription></UiAlert
+          ><UiDialogFooter
+            ><UiButton type="button" variant="outline" :disabled="saving" @click="editing = false"
+              >Cancel</UiButton
+            ><UiButton type="submit" :disabled="saving"
+              ><UiSpinner v-if="saving" data-icon="inline-start" />{{
+                saving ? 'Saving…' : 'Save changes'
+              }}</UiButton
+            ></UiDialogFooter
+          >
+        </form>
+      </AppModal>
+      <UiAlertDialog v-model:open="rejectConfirm"
+        ><UiAlertDialogContent
+          ><UiAlertDialogHeader
+            ><UiAlertDialogTitle>Reject this draft?</UiAlertDialogTitle
+            ><UiAlertDialogDescription
+              >This decision is final for this analysis. You can start a new analysis to get another
+              suggestion.</UiAlertDialogDescription
+            ></UiAlertDialogHeader
+          ><UiAlertDialogFooter
+            ><UiAlertDialogCancel>Keep reviewing</UiAlertDialogCancel
+            ><UiAlertDialogAction variant="destructive" @click="review('reject')"
+              >Reject draft</UiAlertDialogAction
+            ></UiAlertDialogFooter
+          ></UiAlertDialogContent
+        ></UiAlertDialog
+      >
+    </template>
   </div>
 </template>

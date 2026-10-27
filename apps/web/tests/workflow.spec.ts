@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import AxeBuilder from '@axe-core/playwright'
 
 const password = process.env.E2E_PASSWORD || 'Nexus-demo-2026!'
 const login = async (page: import('@playwright/test').Page, email: string) => {
@@ -9,12 +10,55 @@ const login = async (page: import('@playwright/test').Page, email: string) => {
   await expect(page.getByRole('heading', { name: 'Where would you like to work?' })).toBeVisible()
 }
 
+test('core screens and create dialog satisfy automated WCAG checks', async ({ page }) => {
+  const scan = async (screen: string) => {
+    const result = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+      .analyze()
+    expect(
+      result.violations,
+      screen +
+        ': ' +
+        JSON.stringify(
+          result.violations.map((item) => ({
+            id: item.id,
+            impact: item.impact,
+            targets: item.nodes.map((node) => node.target),
+          })),
+        ),
+    ).toEqual([])
+  }
+  await page.goto('/login')
+  await page.getByLabel('Work email').waitFor()
+  await scan('Sign in')
+  await login(page, 'admin@nexus.test')
+  await page.getByRole('button', { name: /Acme Corporation/ }).waitFor()
+  await scan('Workspaces')
+  await page.getByRole('button', { name: /Acme Corporation/ }).click()
+  await page.locator('tbody tr').first().waitFor()
+  await scan('Ticket queue')
+  await page.getByRole('button', { name: 'Create ticket', exact: true }).click()
+  await expect(page.getByLabel('Subject', { exact: true })).toBeFocused()
+  await scan('Create ticket dialog')
+  await page.keyboard.press('Escape')
+  await page.getByRole('link', { name: 'Knowledge base', exact: true }).click()
+  await page.getByRole('heading', { name: 'Knowledge base', exact: true }).waitFor()
+  await scan('Knowledge base')
+  await page.getByRole('link', { name: 'Organization settings' }).click()
+  await page.getByRole('tab', { name: 'Appearance', exact: true }).click()
+  await scan('Appearance')
+  await page.getByRole('button', { name: 'Dark', exact: true }).click()
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await scan('Dark appearance')
+  await page.getByRole('button', { name: 'Light', exact: true }).click()
+})
+
 test('complete ticket → analysis → approval → tenant isolation journey', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
   await login(page, process.env.E2E_EMAIL || 'admin@nexus.test')
   await page.getByRole('button', { name: /Acme Corporation/ }).click()
-  await expect(page.getByRole('heading', { name: 'All tickets' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tickets', exact: true })).toBeVisible()
   const subject = `Delivery delayed · browser ${Date.now()}`
   await page.getByRole('button', { name: 'Create ticket' }).click()
   await page.getByLabel('Subject', { exact: true }).fill(subject)
@@ -30,9 +74,9 @@ test('complete ticket → analysis → approval → tenant isolation journey', a
   await expect(page.getByText('Approved for use. No message has been sent.', { exact: false })).toBeVisible()
   await page.reload()
   await expect(page.getByText('Approved for use. No message has been sent.', { exact: false })).toBeVisible()
-  await page.getByRole('link', { name: /Acme Corporation Workspace/ }).click()
-  await page.getByRole('button', { name: /Nova Technologies/ }).click()
-  await expect(page.getByRole('heading', { name: 'All tickets' })).toBeVisible()
+  await page.getByRole('button', { name: /^Switch workspace:/ }).click()
+  await page.getByRole('menuitem', { name: /Nova Technologies/ }).click()
+  await expect(page.getByRole('heading', { name: 'Tickets', exact: true })).toBeVisible()
   await expect(page.getByText(subject, { exact: true })).toHaveCount(0)
   await expect(page.getByText('Private Nova ticket', { exact: true })).toBeVisible()
   expect(errors).toEqual([])
@@ -64,21 +108,25 @@ test('admin knowledge editing, archiving and audit', async ({ page }) => {
   await page.getByRole('button', { name: new RegExp(title) }).click()
   await page.getByLabel('Active · available to AI retrieval').uncheck()
   await page.getByRole('button', { name: 'Save document' }).click()
-  await expect(page.getByRole('button', { name: new RegExp(title) })).toContainText('archived')
+  await expect(
+    page.locator('[data-slot="card"]').filter({ has: page.getByRole('heading', { name: title }) }),
+  ).toContainText('Archived')
   await page.getByRole('link', { name: 'Organization settings' }).click()
+  await page.getByRole('tab', { name: 'Members', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Workspace members' })).toBeVisible()
-  await expect(page.getByText('knowledge · updated').first()).toBeVisible()
+  await page.getByRole('tab', { name: 'Audit trail', exact: true }).click()
+  await expect(page.getByText('Knowledge updated', { exact: true }).first()).toBeVisible()
 })
 
 test('mobile layout, session restoration, keyboard and logout', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await login(page, 'admin@nexus.test')
   await page.getByRole('button', { name: /Acme Corporation/ }).click()
-  await expect(page.getByRole('heading', { name: 'All tickets' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tickets', exact: true })).toBeVisible()
   await page.locator('tbody tr').first().waitFor()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'All tickets' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Tickets', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Create ticket' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await page.keyboard.press('Escape')
@@ -130,4 +178,87 @@ test('network interruption after acceptance reuses the same analysis operation',
   expect(keys[0]).toBeTruthy()
   expect(keys[0]).toBe(keys[1])
   await expect(page.getByRole('heading', { name: 'Suggested response' })).toBeVisible({ timeout: 40000 })
+})
+
+test('quick navigation and appearance persist across reloads', async ({ page }) => {
+  await login(page, 'admin@nexus.test')
+  await page.getByRole('button', { name: /Acme Corporation/ }).click()
+  await expect(page.getByRole('heading', { name: 'Tickets', exact: true })).toBeVisible()
+  await page.keyboard.press('ControlOrMeta+k')
+  await expect(page.getByRole('dialog', { name: 'Quick navigation' })).toBeVisible()
+  await page.getByPlaceholder('Find a page or workspace…').fill('Knowledge')
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('heading', { name: 'Knowledge base', exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Change appearance' }).click()
+  await page.getByRole('menuitem', { name: 'Dark', exact: true }).click()
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await page.reload()
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await expect(page.getByRole('heading', { name: 'Knowledge base', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Change appearance' }).click()
+  await page.getByRole('menuitem', { name: 'Light', exact: true }).click()
+  await expect(page.locator('html')).not.toHaveClass(/dark/)
+})
+
+test('ticket search recovers from an empty view and dialogs restore focus', async ({ page }) => {
+  await login(page, 'admin@nexus.test')
+  await page.getByRole('button', { name: /Acme Corporation/ }).click()
+  await page.locator('tbody tr').first().waitFor()
+  await page.getByLabel('Search tickets').fill('no-match-' + Date.now())
+  await expect(page.getByText('No matching tickets', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).click()
+  await expect(page.getByLabel('Search tickets')).toHaveValue('')
+  await page.locator('tbody tr').first().waitFor()
+  const create = page.getByRole('button', { name: 'Create ticket', exact: true })
+  await create.click()
+  await expect(page.getByLabel('Subject', { exact: true })).toBeFocused()
+  await page.keyboard.press('Shift+Tab')
+  expect(await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(create).toBeFocused()
+})
+
+test('ticket editing, final rejection and a narrow reduced-motion layout', async ({ page }) => {
+  await login(page, 'admin@nexus.test')
+  await page.getByRole('button', { name: /Acme Corporation/ }).click()
+  await page.getByRole('button', { name: 'Create ticket', exact: true }).click()
+  const subject = 'Priority review ' + Date.now()
+  await page.getByLabel('Subject', { exact: true }).fill(subject)
+  await page
+    .getByLabel('Customer message')
+    .fill('Please help investigate a delayed delivery and confirm the next steps.')
+  await page.getByRole('dialog').getByRole('button', { name: 'Create ticket', exact: true }).click()
+  await expect(page.getByRole('heading', { name: subject })).toBeVisible()
+  await page.getByRole('button', { name: 'Edit ticket' }).click()
+  await page.getByLabel('Priority', { exact: true }).selectOption('urgent')
+  await page.getByLabel('Status', { exact: true }).selectOption('in_progress')
+  await page.getByRole('button', { name: 'Save changes' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByText('Urgent', { exact: true }).first()).toBeVisible()
+  await page.getByRole('button', { name: 'Analyze with AI' }).click()
+  await expect(page.getByRole('heading', { name: 'Suggested response' })).toBeVisible({ timeout: 40000 })
+  await page.getByRole('tab', { name: 'Insights' }).click()
+  await expect(page.getByRole('heading', { name: 'Decision rationale' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Response', exact: true }).click()
+  await page.getByRole('button', { name: 'Reject', exact: true }).click()
+  await expect(page.getByRole('alertdialog', { name: 'Reject this draft?' })).toBeVisible()
+  await page.keyboard.press('ControlOrMeta+k')
+  await expect(page.getByRole('dialog', { name: 'Quick navigation' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Keep reviewing' }).click()
+  await expect(page.getByRole('button', { name: 'Approve draft' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Reject', exact: true }).click()
+  await page.getByRole('button', { name: 'Reject draft', exact: true }).click()
+  await expect(
+    page.getByText('Rejected. Start a new analysis for another suggestion.', { exact: false }),
+  ).toBeVisible()
+  await page.reload()
+  await expect(
+    page.getByText('Rejected. Start a new analysis for another suggestion.', { exact: false }),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve draft' })).toHaveCount(0)
+  await page.setViewportSize({ width: 320, height: 800 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
 })

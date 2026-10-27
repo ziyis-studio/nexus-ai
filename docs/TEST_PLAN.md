@@ -33,13 +33,13 @@ uv run python scripts/benchmark.py
 
 The native security script creates and drops its own temporary database, so its login needs CREATEDB on a disposable PostgreSQL cluster. It exercises actual PostgreSQL grants, RLS, immutable identities, tenant-consistent foreign keys, idempotency, review/audit behavior and terminal-state checks. The worker persistence scenario verifies competing claims, expired-lease takeover, old-token rejection and exactly one result. The HTTP integration scenarios exercise the real FastAPI/PostgREST/RLS boundary.
 
-Browser journeys cover admin login, tenant selection, create ticket, async analysis, knowledge citations, approve, refresh/restore, switch organizations, Viewer restrictions, knowledge creation/archive, audit visibility, mobile overflow, native dialog Escape and logout. Generated screenshots and the recorded walkthrough use synthetic records. Fakeredis is used in the portable Windows preview; the CI integration job uses a real Redis container.
+Nine browser journeys cover login, tenant selection, ticket creation/editing, async analysis, citations, approval/final rejection, session restoration, organization switching, Viewer restrictions, knowledge creation/archive, audit visibility, search recovery, keyboard navigation, theme persistence, dialog focus/Escape, logout and narrow reduced-motion layouts. Automated WCAG A/AA checks cover sign-in, workspaces, the queue, ticket creation, knowledge and light/dark appearance. Screenshots and the walkthrough use synthetic records. Fakeredis is used in the Windows preview; CI integration uses real Redis.
 
 ## Actual Supabase verification
 
 The separate CI `supabase` job starts Supabase's real local Auth, gateway, Data API and database, applies the migration, checks security advisors and pgTAP, provisions accounts using Supabase Admin APIs, then runs sign-in → ticket → worker result → review → logout/session-revocation verification. The model is still a deterministic fixture. The portable auth shim is never accepted as evidence for this job.
 
-`supabase/tests/rls.test.sql` checks RLS/grants/helper exposure with pgTAP. The larger native SQL suite independently tests row behavior and constraints. Hosted Supabase and actual OpenAI calls remain additional staging checks requiring configured owner credentials.
+`supabase/tests/rls.test.sql` checks RLS/grants/helper exposure with pgTAP. The larger native SQL suite independently tests row behavior and constraints. Hosted provisioning and rollback checks are recorded in [HOSTED_DATABASE.md](HOSTED_DATABASE.md). Real-account cloud sign-in and actual OpenAI calls remain staging checks requiring owner credentials.
 
 ## Security coverage
 
@@ -49,4 +49,4 @@ Tests include missing/expired/incorrect-signature/issuer/audience/algorithm JWTs
 
 See RELEASE_STATUS.md for current counts and remote CI state. SQL performance evidence is under `docs/evidence/sql-benchmark.json`; raw plans include buffers and actual timings. The coverage gate targets business schemas/services/repository/provider/worker execution, not generated UI or infrastructure adapters. Coverage is supporting evidence; the native and browser scenarios are the primary end-to-end evidence.
 
-Full development-dependency audit findings are documented in SECURITY.md, including the upstream node-forge issue. Production dependency audit and disabled development TLS features do not make that upstream advisory disappear.
+Run the complete npm dependency audit alongside the production-only gate. The lockfile pins patched node-forge 1.4.1; the current audit evidence and deployment limits are documented in SECURITY.md.

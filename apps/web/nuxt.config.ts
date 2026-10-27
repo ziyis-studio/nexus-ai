@@ -5,22 +5,22 @@ export default defineNuxtConfig({
   srcDir: '.',
   ssr: false,
   devtools: { enabled: false },
+  modules: ['shadcn-nuxt'],
+  shadcn: { prefix: 'Ui', componentDir: './components/ui' },
+  components: [{ path: '~/components', ignore: ['ui/**'] }],
   css: ['~/assets/main.css'],
   vite: { plugins: [tailwindcss()] },
   runtimeConfig: {
-    public: {
-      apiBase: 'http://127.0.0.1:8000',
-      supabaseUrl: '',
-      supabasePublishableKey: '',
-    },
+    public: { apiBase: 'http://127.0.0.1:8000', supabaseUrl: '', supabasePublishableKey: '' },
   },
   app: {
     head: {
-      title: 'NEXUS AI · Ticket intelligence',
+      htmlAttrs: { lang: 'en' },
+      title: 'Nexus · Support intelligence',
       meta: [
         {
           name: 'description',
-          content: 'A clear workspace for customer support, grounded AI analysis and human decisions.',
+          content: 'A focused workspace for customer support, grounded AI drafts and human decisions.',
         },
       ],
       link: [{ rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }],
