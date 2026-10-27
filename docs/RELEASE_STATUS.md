@@ -11,15 +11,19 @@ Implementation candidate for PRD P0. This document distinguishes source completi
 - OpenAI Responses structured-output adapter with input/reference constraints and independent schema/citation validation.
 - Docker application services, health checks, pinned locks, automated CI and operational documentation.
 
+## Interface redesign
+
+The app uses shadcn-vue / Reka Nova components throughout login, workspaces, the responsive shell, tickets, AI review, knowledge, history and settings. Device appearance, keyboard navigation, accessible dialogs and refreshed visual evidence are documented in [UI_DESIGN.md](UI_DESIGN.md).
+
 ## Local evidence
 
 - 74 backend tests passed; selected business modules 85.19% coverage. The OpenAI SDK adapter was exercised against mocked structured-output and refusal responses.
 - 28 RLS/grant/constraint scenarios passed on both WASM PostgreSQL and native PostgreSQL 18.4.
 - 3 real PostgreSQL/PostgREST/API persistence/isolation integration scenarios passed.
-- 5 browser journeys passed: full workflow/tenant switch, Viewer restrictions, knowledge management/audit, mobile/session/keyboard/logout, and replay after a network interruption following analysis acceptance.
+- 9 browser journeys passed: core workflow/tenant isolation, Viewer restrictions, knowledge/audit, mobile/session/logout, interrupted-request replay, quick navigation/theme persistence, search/dialog focus, ticket editing/final rejection and automated WCAG A/AA checks on seven core light/dark surfaces.
 - Nuxt production build and frontend typecheck passed.
 - SQL benchmark used 10,000 tickets and 10 concurrent native database clients; raw measured plans retained.
-- Runtime npm dependency audit: zero findings. Development node-forge advisory remains documented in SECURITY.md.
+- Full and production-only npm dependency audits: zero findings. The Nuxt TLS toolchain is pinned to patched node-forge 1.4.1.
 
 ## CI verification
 
@@ -32,6 +36,6 @@ The DEMO / Nexus Supabase database (`qgooyiokuclpijdwdpzt`) is provisioned with 
 ## Remaining staging configuration
 
 - Real-account cloud sign-in and revocation, application/Redis hosting, a dedicated worker login, production WSS/origin configuration, a real OpenAI inference and deployed performance measurements require hosting configuration and server-side secrets.
-- Upstream development TLS dependency advisory requires continued review. The P0 production acceptance gate is not declared passed while this remains unresolved.
+- The earlier TLS dependency advisory is addressed by the pinned patch. Production acceptance still requires the real-account/provider and hosting checks above.
 
 The portable preview is a functioning review environment with native PostgreSQL and PostgREST, synthetic identity, Fakeredis transport and deterministic model output. It is never a claim of real OpenAI inference or a hosted production deployment. The existing Planner Core Supabase project has not been modified.

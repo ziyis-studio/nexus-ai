@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ArrowRight, BookOpen, FileText, Plus, Search } from '@lucide/vue'
+import { useDebounceFn } from '@vueuse/core'
 import type { Knowledge, Page } from '~/types'
 const route = useRoute()
 const tid = String(route.params.tenant_id)
@@ -21,21 +23,41 @@ const form = reactive({
   is_active: true,
 })
 const admin = computed(() => auth.selected.value?.role === 'admin')
+const kinds = [
+  { value: 'faq', label: 'FAQ' },
+  { value: 'policy', label: 'Policy' },
+  { value: 'product_information', label: 'Product information' },
+  { value: 'general_reference', label: 'General reference' },
+]
+const kind = (value: string) => kinds.find((item) => item.value === value)?.label || value
+let version = 0
+let disposed = false
+let controller: AbortController | null = null
 const load = async (more = false) => {
+  if (disposed) return
+  const request = ++version
+  controller?.abort()
+  controller = new AbortController()
   loading.value = true
   error.value = ''
   try {
-    const page = await api<Page<Knowledge>>(`/tenants/${tid}/knowledge`, {
+    const page = await api<Page<Knowledge>>('/tenants/' + tid + '/knowledge', {
       query: { q: q.value || undefined, cursor: more ? cursor.value || undefined : undefined },
+      signal: controller.signal,
     })
+    if (request !== version || disposed) return
     items.value = more ? [...items.value, ...page.items] : page.items
     cursor.value = page.next_cursor
   } catch (e) {
-    error.value = (e as Error).message
+    if (request === version && !disposed) error.value = (e as Error).message
   } finally {
-    loading.value = false
+    if (request === version && !disposed) loading.value = false
   }
 }
+watch(
+  q,
+  useDebounceFn(() => load(), 300),
+)
 const open = (doc: Knowledge | null) => {
   selected.value = doc
   Object.assign(
@@ -52,7 +74,7 @@ const save = async () => {
   saving.value = true
   saveError.value = ''
   try {
-    await api(`/tenants/${tid}/knowledge${selected.value ? `/${selected.value.id}` : ''}`, {
+    await api('/tenants/' + tid + '/knowledge' + (selected.value ? '/' + selected.value.id : ''), {
       method: selected.value ? 'PATCH' : 'POST',
       body: form,
     })
@@ -70,116 +92,191 @@ onMounted(async () => {
   if (route.query.document) {
     try {
       open(
-        await api<Knowledge>(`/tenants/${tid}/knowledge/${encodeURIComponent(String(route.query.document))}`),
+        await api<Knowledge>(
+          '/tenants/' + tid + '/knowledge/' + encodeURIComponent(String(route.query.document)),
+        ),
       )
     } catch (e) {
       error.value = (e as Error).message
     }
   }
 })
+onBeforeUnmount(() => {
+  disposed = true
+  version++
+  controller?.abort()
+})
 </script>
 <template>
   <div>
-    <AppHeader
-      eyebrow="YOUR ORGANIZATION’S CONTEXT"
-      title="Knowledge that makes answers better."
-      description="A shared source of truth for your team and your AI."
-      ><button v-if="admin" class="btn btn-primary" @click="open(null)">
-        <NIcon name="Plus" />New document
-      </button></AppHeader
+    <AppHeader title="Knowledge base" description="The policies and context behind better customer responses."
+      ><UiButton v-if="admin" @click="open(null)"
+        ><Plus data-icon="inline-start" />New document</UiButton
+      ></AppHeader
     >
-    <div class="knowledge-banner">
-      <span class="knowledge-banner-icon"><NIcon name="BookOpen" :size="25" /></span>
-      <div>
-        <strong>Good answers start with good context.</strong>
-        <p>
-          Active documents are available to AI analysis within this workspace. Archive outdated material to
-          keep suggestions relevant.
-        </p>
-      </div>
-      <span class="engine-pill"><NIcon name="ShieldCheck" :size="14" />Tenant-scoped retrieval</span>
-    </div>
-    <div class="section-toolbar">
-      <h2>Knowledge library</h2>
-      <form class="search-field" @submit.prevent="load()">
-        <NIcon name="Search" :size="17" /><input
-          v-model="q"
-          aria-label="Search knowledge"
-          placeholder="Search documents…"
-          maxlength="200"
-          type="search"
-        /><button class="icon-btn" aria-label="Search knowledge library">
-          <NIcon name="ArrowRight" :size="16" />
-        </button>
+    <UiAlert class="mb-6"
+      ><BookOpen /><UiAlertTitle>Give every draft a reliable foundation.</UiAlertTitle
+      ><UiAlertDescription
+        >Active documents are available to AI in this workspace. Archive outdated material to keep future
+        drafts relevant.</UiAlertDescription
+      ></UiAlert
+    >
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+      <h2 class="text-sm font-medium">
+        All documents<span class="ml-2 text-muted-foreground">{{ items.length }} loaded</span>
+      </h2>
+      <form class="w-full sm:max-w-xs" @submit.prevent="load()">
+        <UiInputGroup
+          ><UiInputGroupAddon><Search /></UiInputGroupAddon
+          ><UiInputGroupInput
+            v-model="q"
+            aria-label="Search knowledge"
+            placeholder="Search document titles…"
+            type="search"
+            maxlength="200"
+        /></UiInputGroup>
       </form>
     </div>
     <ViewState
       :loading="loading && !items.length"
       :error="error"
       :empty="!loading && !items.length"
-      title="Build your team’s knowledge."
-      description="Add a policy, FAQ, or product guide to give AI useful context."
+      :title="q ? 'No matching documents' : 'Build your knowledge base'"
+      :description="
+        q
+          ? 'Try another title or clear your search.'
+          : 'Add a policy, FAQ, or product guide to give your team and AI useful context.'
+      "
       @retry="load()"
-    />
-    <div v-if="!error" class="knowledge-grid">
-      <button v-for="doc in items" :key="doc.id" class="knowledge-card" @click="open(doc)">
-        <div>
-          <span class="doc-icon"><NIcon name="FileText" :size="23" /></span
-          ><StatusBadge :value="doc.is_active ? 'active' : 'archived'" />
-        </div>
-        <span class="eyebrow">{{ doc.document_type.replaceAll('_', ' ') }}</span>
-        <h3>{{ doc.title }}</h3>
-        <p>{{ doc.content.slice(0, 150) }}{{ doc.content.length > 150 ? '…' : '' }}</p>
-        <footer>
-          <span
+      ><UiButton v-if="q" variant="outline" @click="q = ''">Clear search</UiButton
+      ><UiButton v-else-if="admin" @click="open(null)"
+        ><Plus data-icon="inline-start" />New document</UiButton
+      ></ViewState
+    >
+    <div v-if="!error" class="document-grid">
+      <UiCard v-for="doc in items" :key="doc.id">
+        <UiCardHeader class="gap-4"
+          ><div class="flex items-center justify-between gap-3">
+            <UiAvatar class="size-10 rounded-lg"
+              ><UiAvatarFallback class="rounded-lg"><FileText class="size-5" /></UiAvatarFallback></UiAvatar
+            ><StatusBadge :value="doc.is_active ? 'active' : 'archived'" />
+          </div>
+          <div class="flex flex-col gap-2">
+            <UiCardDescription>{{ kind(doc.document_type) }}</UiCardDescription
+            ><UiCardTitle
+              ><h2 class="line-clamp-2">{{ doc.title }}</h2></UiCardTitle
+            >
+          </div></UiCardHeader
+        >
+        <UiCardContent class="flex-1"
+          ><p class="line-clamp-3 text-sm leading-7 text-muted-foreground">
+            {{ doc.content }}
+          </p></UiCardContent
+        >
+        <UiCardFooter class="justify-between gap-3"
+          ><span class="text-xs text-muted-foreground"
             >Updated
             {{
               new Date(doc.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
             }}</span
-          ><NIcon name="ArrowUpRight" :size="17" />
-        </footer>
-      </button>
+          ><UiButton
+            variant="ghost"
+            size="sm"
+            :aria-label="(admin ? 'Edit ' : 'Open ') + doc.title"
+            @click="open(doc)"
+            >{{ admin ? 'Edit' : 'Open' }}<ArrowRight data-icon="inline-end" /></UiButton
+        ></UiCardFooter>
+      </UiCard>
     </div>
-    <button v-if="cursor" class="btn load-more" :disabled="loading" @click="load(true)">
-      {{ loading ? 'Loading…' : 'Load more documents' }}</button
-    ><AppModal
+    <div v-if="cursor && !error" class="mt-6 flex justify-center">
+      <UiButton variant="outline" :disabled="loading" @click="load(true)"
+        ><UiSpinner v-if="loading" data-icon="inline-start" />{{
+          loading ? 'Loading…' : 'Load more documents'
+        }}</UiButton
+      >
+    </div>
+    <AppModal
       v-model:open="show"
       :title="selected ? (admin ? 'Edit knowledge document' : selected.title) : 'New knowledge document'"
+      :description="
+        admin
+          ? 'Keep guidance clear and current. Changes apply to future AI analyses.'
+          : selected
+            ? kind(selected.document_type)
+            : undefined
+      "
+      :busy="saving"
       wide
-      ><form v-if="admin" class="stack-form" @submit.prevent="save">
-        <label for="doc-title">Title</label
-        ><input id="doc-title" v-model="form.title" minlength="3" maxlength="200" required /><label
-          for="doc-type"
-          >Document type</label
-        ><select id="doc-type" v-model="form.document_type">
-          <option value="faq">FAQ</option>
-          <option value="policy">Policy</option>
-          <option value="product_information">Product information</option>
-          <option value="general_reference">General reference</option></select
-        ><label for="doc-content">Content</label
-        ><textarea
-          id="doc-content"
-          v-model="form.content"
-          rows="13"
-          minlength="10"
-          maxlength="50000"
-          required
-        /><label class="checkbox-label"
-          ><input v-model="form.is_active" type="checkbox" />Active · available to AI retrieval</label
-        >
-        <p class="muted">Uncheck to archive this document. Previous analyses keep their references.</p>
-        <p v-if="saveError" class="form-error" role="alert">{{ saveError }}</p>
-        <div class="form-actions">
-          <button type="button" class="btn" @click="show = false">Cancel</button
-          ><button class="btn btn-primary" :disabled="saving">
-            {{ saving ? 'Saving…' : 'Save document' }}
-          </button>
-        </div>
-      </form>
-      <div v-else-if="selected" class="document-reader">
-        <StatusBadge :value="selected.is_active ? 'active' : 'archived'" />
-        <p>{{ selected.content }}</p>
-      </div></AppModal
     >
+      <form v-if="admin" class="flex flex-col gap-6" @submit.prevent="save">
+        <UiFieldGroup>
+          <UiField
+            ><UiFieldLabel for="doc-title">Title</UiFieldLabel
+            ><UiInput
+              id="doc-title"
+              v-model="form.title"
+              minlength="3"
+              maxlength="200"
+              required
+              :disabled="saving"
+              placeholder="e.g. Delivery support procedure"
+          /></UiField>
+          <UiField
+            ><UiFieldLabel for="doc-type">Document type</UiFieldLabel
+            ><UiNativeSelect id="doc-type" v-model="form.document_type" class="w-full" :disabled="saving"
+              ><option v-for="item in kinds" :key="item.value" :value="item.value">
+                {{ item.label }}
+              </option></UiNativeSelect
+            ></UiField
+          >
+          <UiField
+            ><div class="flex items-center justify-between">
+              <UiFieldLabel for="doc-content">Content</UiFieldLabel
+              ><span class="text-xs text-muted-foreground"
+                >{{ form.content.length.toLocaleString() }} / 50,000</span
+              >
+            </div>
+            <UiTextarea
+              id="doc-content"
+              v-model="form.content"
+              rows="10"
+              minlength="10"
+              maxlength="50000"
+              required
+              :disabled="saving"
+              placeholder="Write the guidance your team should reference…"
+          /></UiField>
+          <UiField orientation="horizontal"
+            ><UiCheckbox
+              id="doc-active"
+              :model-value="form.is_active"
+              :disabled="saving"
+              @update:model-value="form.is_active = $event === true"
+            /><UiFieldContent
+              ><UiFieldLabel for="doc-active">Active · available to AI retrieval</UiFieldLabel
+              ><UiFieldDescription
+                >Uncheck to archive. Previous analyses keep their references.</UiFieldDescription
+              ></UiFieldContent
+            ></UiField
+          >
+        </UiFieldGroup>
+        <UiAlert v-if="saveError" variant="destructive" role="alert"
+          ><UiAlertTitle>Document not saved</UiAlertTitle
+          ><UiAlertDescription>{{ saveError }}</UiAlertDescription></UiAlert
+        >
+        <UiDialogFooter
+          ><UiButton type="button" variant="outline" :disabled="saving" @click="show = false">Cancel</UiButton
+          ><UiButton type="submit" :disabled="saving"
+            ><UiSpinner v-if="saving" data-icon="inline-start" />{{
+              saving ? 'Saving…' : 'Save document'
+            }}</UiButton
+          ></UiDialogFooter
+        >
+      </form>
+      <article v-else-if="selected" class="flex flex-col gap-5">
+        <StatusBadge :value="selected.is_active ? 'active' : 'archived'" /><UiSeparator />
+        <p class="message-text">{{ selected.content }}</p>
+      </article>
+    </AppModal>
   </div>
 </template>

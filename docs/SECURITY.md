@@ -38,6 +38,8 @@ The public project key is intentionally public. No service-role key belongs in `
 
 ## Dependency review
 
-The lockfiles pin resolved versions. Production `npm audit --omit=dev --audit-level=high` reports zero findings in the verified dependency set. Nuxt/build tooling currently includes a transitive `node-forge` advisory, GHSA-86w9-cpqp-85rv, propagated through local TLS certificate tooling. The registry has no patched node-forge release at the checked version; this is not silently waived as fixed. Nuxt is pinned to 4.6.2 with DevTools disabled, local preview binds to loopback, production serves the generated output, and authentication uses PyJWT/cryptography rather than node-forge. Recheck full development dependencies before exposing a development server or changing TLS handling. See the release status for this unresolved upstream advisory.
+The lockfiles pin resolved versions. Both the complete npm dependency audit and the production-only audit report zero findings in the verified dependency set. The Nuxt TLS toolchain resolves `node-forge` to 1.4.1 through an explicit override. The maintainer's [1.4.1 changelog](https://github.com/digitalbazaar/forge/blob/v1.4.1/CHANGELOG.md) documents the fix for CVE-2026-85393 and related security issues.
 
-The P0 production acceptance gate remains conditional on reviewing this upstream development dependency advisory and completing a real Supabase/LLM staging verification. Passing synthetic tests does not certify a production deployment.
+Nuxt stays pinned to 4.6.2 with DevTools disabled. Local previews bind to loopback, production serves generated output, and authentication uses PyJWT/cryptography rather than node-forge. Dependency audits are point-in-time evidence and should be repeated when lockfiles or deployment tooling change.
+
+Production acceptance still requires real-account cloud authentication/revocation, actual model inference and the remaining hosted configuration. Passing synthetic tests does not certify a production deployment.

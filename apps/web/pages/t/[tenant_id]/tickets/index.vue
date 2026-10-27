@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ArrowLeft, ArrowRight, BookOpen, Inbox, Plus, RefreshCw, Search, X } from '@lucide/vue'
+import { useDebounceFn } from '@vueuse/core'
 import type { Page, Ticket } from '~/types'
 const tid = String(useRoute().params.tenant_id)
 const api = useApi()
@@ -11,11 +13,12 @@ const previousCursors = ref<(string | undefined)[]>([])
 const loading = ref(true)
 const error = ref('')
 const q = ref('')
-const status = ref('')
+const status = ref('all')
 const priority = ref('')
 const showCreate = ref(false)
 const saving = ref(false)
 const saveError = ref('')
+const customerDetails = ref(false)
 const form = reactive({
   subject: '',
   description: '',
@@ -23,9 +26,19 @@ const form = reactive({
   customer_email: '',
   external_reference: '',
 })
+const statuses = [
+  { value: 'all', label: 'All tickets' },
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'closed', label: 'Closed' },
+]
+const hasFilters = computed(() => !!q.value || status.value !== 'all' || !!priority.value)
 let controller: AbortController | null = null
 let version = 0
+let disposed = false
 const load = async (next?: string) => {
+  if (disposed) return
   const request = ++version
   controller?.abort()
   controller = new AbortController()
@@ -33,27 +46,38 @@ const load = async (next?: string) => {
   error.value = ''
   currentCursor.value = next
   try {
-    const result = await api<Page<Ticket>>(`/tenants/${tid}/tickets`, {
+    const result = await api<Page<Ticket>>('/tenants/' + tid + '/tickets', {
       query: {
         q: q.value || undefined,
-        status: status.value || undefined,
+        status: status.value === 'all' ? undefined : status.value,
         priority: priority.value || undefined,
         cursor: next,
       },
       signal: controller.signal,
     })
-    if (request !== version) return
+    if (request !== version || disposed) return
     items.value = result.items
     cursor.value = result.next_cursor
   } catch (e) {
-    if (request === version) error.value = (e as Error).message
+    if (request === version && !disposed) error.value = (e as Error).message
   } finally {
-    if (request === version) loading.value = false
+    if (request === version && !disposed) loading.value = false
   }
 }
 const filter = () => {
   previousCursors.value = []
   void load()
+}
+watch(q, useDebounceFn(filter, 300))
+watch([status, priority], filter)
+const clearFilters = () => {
+  q.value = ''
+  status.value = 'all'
+  priority.value = ''
+}
+const openCreate = () => {
+  saveError.value = ''
+  showCreate.value = true
 }
 const nextPage = () => {
   if (cursor.value) {
@@ -69,7 +93,7 @@ const create = async () => {
   saving.value = true
   saveError.value = ''
   try {
-    const ticket = await api<Ticket>(`/tenants/${tid}/tickets`, {
+    const ticket = await api<Ticket>('/tenants/' + tid + '/tickets', {
       method: 'POST',
       body: {
         ...form,
@@ -79,8 +103,8 @@ const create = async () => {
       },
     })
     showCreate.value = false
-    success('Ticket created. Ready for your team.')
-    await navigateTo(`/t/${tid}/tickets/${ticket.id}`)
+    success('Ticket created.')
+    await navigateTo('/t/' + tid + '/tickets/' + ticket.id)
   } catch (e) {
     saveError.value = (e as Error).message
   } finally {
@@ -91,228 +115,263 @@ const date = (value: string) =>
   new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 onMounted(() => load())
 onBeforeUnmount(() => {
+  disposed = true
   version++
   controller?.abort()
 })
 </script>
 <template>
-  <div>
-    <AppHeader
-      eyebrow="CUSTOMER OPERATIONS"
-      title="A clearer view of every conversation."
-      description="Triage with context. Respond with confidence."
-      ><button
-        v-if="auth.selected.value?.role !== 'viewer'"
-        class="btn btn-primary"
-        @click="showCreate = true"
+  <div class="flex flex-col gap-0">
+    <AppHeader title="Tickets" description="Your customer conversations. One focused queue.">
+      <UiButton v-if="auth.selected.value?.role !== 'viewer'" @click="openCreate"
+        ><Plus data-icon="inline-start" />Create ticket</UiButton
       >
-        <NIcon name="Plus" :size="17" />Create ticket
-      </button></AppHeader
-    >
-    <div class="overview-grid">
-      <div class="overview-card">
-        <div>
-          <span class="card-label">Tickets in view</span
-          ><span class="metric-icon"><NIcon name="Inbox" /></span>
-        </div>
-        <strong>{{ loading ? '—' : String(items.length).padStart(2, '0') }}</strong
-        ><small>Conversations on this page</small>
-        <div class="mini-bars">
-          <i
-            v-for="(height, i) in [20, 35, 24, 46, 30, 55, 39, 64, 42, 54, 70, 58]"
-            :key="i"
-            :style="{ height: `${height}%` }"
-          />
-        </div>
+    </AppHeader>
+    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div class="max-w-full overflow-x-auto">
+        <UiToggleGroup
+          type="single"
+          :model-value="status"
+          :spacing="1"
+          aria-label="Filter by status"
+          @update:model-value="status = String($event || 'all')"
+          ><UiToggleGroupItem
+            v-for="option in statuses"
+            :key="option.value"
+            :value="option.value"
+            class="shrink-0"
+            >{{ option.label }}</UiToggleGroupItem
+          ></UiToggleGroup
+        >
       </div>
-      <div class="overview-card">
-        <div>
-          <span class="card-label">Open conversations</span
-          ><span class="metric-icon"><NIcon name="Clock3" /></span>
-        </div>
-        <strong>{{
-          loading
-            ? '—'
-            : String(items.filter((t) => ['open', 'in_progress'].includes(t.status)).length).padStart(2, '0')
-        }}</strong
-        ><small><span class="small-dot" />Ready for the next step · current page</small>
-      </div>
-      <div class="overview-card overview-ai">
-        <div>
-          <span class="card-label">High attention</span><span class="metric-icon"><NIcon name="Zap" /></span>
-        </div>
-        <strong>{{
-          loading
-            ? '—'
-            : String(items.filter((t) => ['urgent', 'high'].includes(t.priority)).length).padStart(2, '0')
-        }}</strong
-        ><small>High & urgent priority · current page</small><span class="abstract-orbit" />
-      </div>
+      <span class="text-xs text-muted-foreground">Newest first</span>
     </div>
-    <section class="panel ticket-panel">
-      <div class="panel-heading">
-        <div>
-          <h2>
-            All tickets <span class="count-label">{{ items.length }}</span>
-          </h2>
-          <p>Your team’s conversations, in one place.</p>
-        </div>
-        <span class="subtle-note"><span class="small-dot" />Newest first</span>
-      </div>
-      <form class="table-toolbar" @submit.prevent="filter">
-        <div class="search-field">
-          <NIcon name="Search" :size="17" /><input
-            v-model="q"
-            aria-label="Search tickets"
-            placeholder="Search conversations…"
-            maxlength="200"
-            type="search"
-          />
-        </div>
-        <div class="filter-controls">
-          <select v-model="status" aria-label="Filter by status" @change="filter">
-            <option value="">All statuses</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In progress</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option></select
-          ><select v-model="priority" aria-label="Filter by priority" @change="filter">
-            <option value="">All priorities</option>
-            <option value="urgent">Urgent</option>
-            <option value="high">High</option>
-            <option value="normal">Normal</option>
-            <option value="low">Low</option></select
-          ><button class="btn btn-filter" aria-label="Apply filters">
-            <NIcon name="SlidersHorizontal" :size="16" />
-          </button>
-        </div>
-      </form>
-      <ViewState
-        :loading="loading"
-        :error="error"
-        :empty="!items.length"
-        title="A clean slate."
-        description="Create your first ticket or adjust your filters to get started."
-        @retry="load(currentCursor)"
-      />
-      <div v-if="!loading && !error && items.length" class="table-scroll">
-        <table class="ticket-table">
-          <thead>
-            <tr>
-              <th>CONVERSATION</th>
-              <th>STATUS</th>
-              <th>PRIORITY</th>
-              <th>CUSTOMER</th>
-              <th>CREATED</th>
-              <th><span class="sr-only">Open ticket</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="ticket in items" :key="ticket.id">
-              <td>
-                <NuxtLink :to="`/t/${tid}/tickets/${ticket.id}`" class="ticket-subject"
-                  ><span class="ticket-symbol"><NIcon name="Inbox" :size="17" /></span
-                  ><span
-                    ><strong>{{ ticket.subject }}</strong
-                    ><small
-                      >#{{ ticket.id.slice(0, 8) }}
-                      <span
-                        >· {{ ticket.description.slice(0, 58)
-                        }}{{ ticket.description.length > 58 ? '…' : '' }}</span
-                      ></small
-                    ></span
-                  ></NuxtLink
-                >
-              </td>
-              <td><StatusBadge :value="ticket.status" /></td>
-              <td>
-                <span class="priority-label" :class="`priority-${ticket.priority}`"
-                  ><span class="priority-bars"><i /><i /><i /></span>{{ ticket.priority }}</span
-                >
-              </td>
-              <td>
-                <span class="customer-cell"
-                  ><span class="customer-avatar">{{
-                    (ticket.customer_name || ticket.customer_email || '?').slice(0, 1).toUpperCase()
-                  }}</span
-                  >{{ ticket.customer_name || ticket.customer_email || 'Unassigned' }}</span
-                >
-              </td>
-              <td class="date-cell">{{ date(ticket.created_at) }}</td>
-              <td>
-                <NuxtLink
-                  :to="`/t/${tid}/tickets/${ticket.id}`"
-                  class="icon-btn"
-                  :aria-label="`Open ${ticket.subject}`"
-                  ><NIcon name="ArrowUpRight" :size="17"
-                /></NuxtLink>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="table-footer">
-        <span>{{ items.length }} conversations on this page</span>
-        <div>
-          <button class="btn btn-small" :disabled="!previousCursors.length || loading" @click="previousPage">
-            <NIcon name="ArrowLeft" :size="14" />Previous</button
-          ><button class="btn btn-small" :disabled="!cursor || loading" @click="nextPage">
-            Next<NIcon name="ArrowRight" :size="14" />
-          </button>
-        </div>
-      </div>
-    </section>
-    <div class="intelligence-note">
-      <span class="note-symbol"><NIcon name="Sparkles" :size="19" /></span>
-      <div>
-        <strong>Context makes all the difference.</strong
-        ><span>Your knowledge base helps AI draft answers grounded in your organization’s policies.</span>
-      </div>
-      <NuxtLink :to="`/t/${tid}/knowledge`"
-        >Explore knowledge base<NIcon name="ArrowRight" :size="15"
-      /></NuxtLink>
-    </div>
-    <AppModal v-model:open="showCreate" title="Create a ticket"
-      ><form class="stack-form" @submit.prevent="create">
-        <p class="muted">Capture the conversation. AI analysis starts when you choose.</p>
-        <label for="subject">Subject</label
-        ><input
-          id="subject"
-          v-model="form.subject"
-          required
-          minlength="3"
-          maxlength="200"
-          placeholder="What does your customer need help with?"
-        /><label for="description">Customer message</label
-        ><textarea
-          id="description"
-          v-model="form.description"
-          required
-          minlength="10"
-          maxlength="10000"
-          rows="6"
-          placeholder="Add the details, in English or Chinese…"
-        />
-        <details>
-          <summary>Customer details <span class="muted">(optional)</span></summary>
-          <div class="stack-form optional-fields">
-            <label for="customer-name">Customer name</label
-            ><input id="customer-name" v-model="form.customer_name" maxlength="150" /><label
-              for="customer-email"
-              >Customer email</label
-            ><input id="customer-email" v-model="form.customer_email" type="email" maxlength="254" /><label
-              for="external-ref"
-              >External reference</label
-            ><input id="external-ref" v-model="form.external_reference" maxlength="200" />
+    <UiCard class="gap-0 py-0">
+      <UiCardHeader class="gap-0 p-0"
+        ><UiCardTitle class="sr-only"><h2>Ticket queue</h2></UiCardTitle
+        ><UiCardDescription class="sr-only"
+          >Search, filter, and open your workspace conversations.</UiCardDescription
+        >
+        <div class="surface-toolbar">
+          <form class="min-w-0 flex-1 basis-full sm:basis-auto sm:max-w-sm" @submit.prevent="filter">
+            <UiInputGroup
+              ><UiInputGroupAddon><Search /></UiInputGroupAddon
+              ><UiInputGroupInput
+                v-model="q"
+                aria-label="Search tickets"
+                placeholder="Search tickets…"
+                type="search"
+                maxlength="200" /><UiInputGroupAddon v-if="q" align="inline-end"
+                ><UiInputGroupButton
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Clear search"
+                  @click="q = ''"
+                  ><X /></UiInputGroupButton></UiInputGroupAddon
+            ></UiInputGroup>
+          </form>
+          <div class="flex items-center gap-2">
+            <UiNativeSelect v-model="priority" aria-label="Filter by priority"
+              ><option value="">All priorities</option>
+              <option value="urgent">Urgent</option>
+              <option value="high">High</option>
+              <option value="normal">Normal</option>
+              <option value="low">Low</option></UiNativeSelect
+            >
+            <UiTooltip
+              ><UiTooltipTrigger as-child
+                ><UiButton
+                  variant="outline"
+                  size="icon"
+                  :disabled="loading"
+                  aria-label="Refresh tickets"
+                  @click="load(currentCursor)"
+                  ><RefreshCw /></UiButton></UiTooltipTrigger
+              ><UiTooltipContent>Refresh tickets</UiTooltipContent></UiTooltip
+            >
           </div>
-        </details>
-        <p v-if="saveError" class="form-error" role="alert">{{ saveError }}</p>
-        <div class="form-actions">
-          <button type="button" class="btn" @click="showCreate = false">Cancel</button
-          ><button class="btn btn-primary" :disabled="saving">
-            {{ saving ? 'Creating…' : 'Create ticket' }}<NIcon name="ArrowRight" :size="16" />
-          </button>
-        </div></form
-    ></AppModal>
+        </div>
+      </UiCardHeader>
+      <UiSeparator />
+      <UiCardContent class="p-0">
+        <ViewState
+          :loading="loading"
+          :error="error"
+          :empty="!items.length"
+          :title="hasFilters ? 'No matching tickets' : 'Your queue starts here'"
+          :description="
+            hasFilters
+              ? 'Try a different search or clear your filters.'
+              : 'Create a ticket to bring a customer conversation into your workspace.'
+          "
+          @retry="load(currentCursor)"
+        >
+          <UiButton v-if="hasFilters" variant="outline" @click="clearFilters">Clear filters</UiButton>
+          <UiButton v-else-if="auth.selected.value?.role !== 'viewer'" @click="showCreate = true"
+            ><Plus data-icon="inline-start" />Create ticket</UiButton
+          >
+        </ViewState>
+        <UiTable v-if="!loading && !error && items.length" class="table-fixed">
+          <UiTableHeader
+            ><UiTableRow
+              ><UiTableHead class="w-[66%] pl-5 sm:w-[55%] lg:w-[44%]">Conversation</UiTableHead
+              ><UiTableHead class="w-[34%] sm:w-[20%] lg:w-[14%]">Status</UiTableHead
+              ><UiTableHead class="hidden w-[25%] sm:table-cell md:w-[15%] lg:w-[12%]">Priority</UiTableHead
+              ><UiTableHead class="hidden w-[20%] lg:table-cell">Customer</UiTableHead
+              ><UiTableHead class="hidden w-[10%] pr-5 text-right md:table-cell"
+                >Created</UiTableHead
+              ></UiTableRow
+            ></UiTableHeader
+          >
+          <UiTableBody
+            ><UiTableRow v-for="ticket in items" :key="ticket.id">
+              <UiTableCell class="min-w-0 pl-5">
+                <NuxtLink :to="'/t/' + tid + '/tickets/' + ticket.id" class="table-subject">
+                  <UiAvatar class="hidden size-8 shrink-0 rounded-lg sm:flex"
+                    ><UiAvatarFallback class="rounded-lg"><Inbox class="size-4" /></UiAvatarFallback
+                  ></UiAvatar>
+                  <span class="table-subject-copy"
+                    ><strong class="truncate">{{ ticket.subject }}</strong
+                    ><small class="truncate"
+                      >#{{ ticket.id.slice(0, 8) }} · {{ ticket.description.slice(0, 75) }}</small
+                    ><small class="capitalize sm:hidden">{{ ticket.priority }} priority</small></span
+                  >
+                </NuxtLink>
+              </UiTableCell>
+              <UiTableCell><StatusBadge :value="ticket.status" /></UiTableCell
+              ><UiTableCell class="hidden sm:table-cell"
+                ><StatusBadge :value="ticket.priority"
+              /></UiTableCell>
+              <UiTableCell class="hidden lg:table-cell"
+                ><span class="flex items-center gap-2"
+                  ><UiAvatar class="size-6"
+                    ><UiAvatarFallback>{{
+                      (ticket.customer_name || ticket.customer_email || '?').slice(0, 1).toUpperCase()
+                    }}</UiAvatarFallback></UiAvatar
+                  ><span class="max-w-36 truncate">{{
+                    ticket.customer_name || ticket.customer_email || 'Not specified'
+                  }}</span></span
+                ></UiTableCell
+              >
+              <UiTableCell
+                class="hidden whitespace-nowrap pr-5 text-right text-muted-foreground md:table-cell"
+                >{{ date(ticket.created_at) }}</UiTableCell
+              >
+            </UiTableRow></UiTableBody
+          >
+        </UiTable>
+      </UiCardContent>
+      <UiCardFooter class="p-0"
+        ><div class="table-bottom w-full">
+          <span>{{
+            loading
+              ? 'Loading tickets…'
+              : items.length + (items.length === 1 ? ' ticket' : ' tickets') + ' on this page'
+          }}</span>
+          <div class="flex items-center gap-2">
+            <UiButton
+              variant="outline"
+              size="sm"
+              :disabled="!previousCursors.length || loading"
+              @click="previousPage"
+              ><ArrowLeft data-icon="inline-start" />Previous</UiButton
+            ><UiButton variant="outline" size="sm" :disabled="!cursor || loading" @click="nextPage"
+              >Next<ArrowRight data-icon="inline-end"
+            /></UiButton>
+          </div></div
+      ></UiCardFooter>
+    </UiCard>
+    <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+      <span class="flex items-center gap-2"
+        ><BookOpen class="size-4" />Better context makes better drafts.</span
+      ><UiButton as-child variant="link" size="sm"
+        ><NuxtLink :to="'/t/' + tid + '/knowledge'"
+          >Open knowledge base<ArrowRight data-icon="inline-end" /></NuxtLink
+      ></UiButton>
+    </div>
+    <AppModal
+      v-model:open="showCreate"
+      title="Create a ticket"
+      description="Capture the customer’s message. You choose when to run an AI analysis."
+      :busy="saving"
+      wide
+    >
+      <form class="flex flex-col gap-6" @submit.prevent="create">
+        <UiFieldGroup>
+          <UiField
+            ><UiFieldLabel for="subject">Subject</UiFieldLabel
+            ><UiInput
+              id="subject"
+              v-model="form.subject"
+              required
+              minlength="3"
+              maxlength="200"
+              placeholder="What does the customer need help with?"
+              :disabled="saving"
+          /></UiField>
+          <UiField
+            ><div class="flex items-center justify-between">
+              <UiFieldLabel for="description">Customer message</UiFieldLabel
+              ><span class="text-xs text-muted-foreground"
+                >{{ form.description.length.toLocaleString() }} / 10,000</span
+              >
+            </div>
+            <UiTextarea
+              id="description"
+              v-model="form.description"
+              required
+              minlength="10"
+              maxlength="10000"
+              rows="6"
+              placeholder="Paste or write the conversation, in English or Chinese…"
+              :disabled="saving"
+          /></UiField>
+          <UiCollapsible v-model:open="customerDetails"
+            ><UiCollapsibleTrigger as-child
+              ><UiButton type="button" variant="ghost" size="sm"
+                ><Plus data-icon="inline-start" />Customer details
+                <span class="text-muted-foreground">(optional)</span></UiButton
+              ></UiCollapsibleTrigger
+            ><UiCollapsibleContent>
+              <UiFieldGroup class="mt-5"
+                ><UiField
+                  ><UiFieldLabel for="customer-name">Customer name</UiFieldLabel
+                  ><UiInput
+                    id="customer-name"
+                    v-model="form.customer_name"
+                    maxlength="150"
+                    :disabled="saving" /></UiField
+                ><UiField
+                  ><UiFieldLabel for="customer-email">Customer email</UiFieldLabel
+                  ><UiInput
+                    id="customer-email"
+                    v-model="form.customer_email"
+                    type="email"
+                    maxlength="254"
+                    :disabled="saving" /></UiField
+                ><UiField
+                  ><UiFieldLabel for="external-ref">External reference</UiFieldLabel
+                  ><UiInput
+                    id="external-ref"
+                    v-model="form.external_reference"
+                    maxlength="200"
+                    :disabled="saving" /></UiField
+              ></UiFieldGroup> </UiCollapsibleContent
+          ></UiCollapsible>
+        </UiFieldGroup>
+        <UiAlert v-if="saveError" variant="destructive" role="alert"
+          ><UiAlertTitle>Ticket not created</UiAlertTitle
+          ><UiAlertDescription>{{ saveError }}</UiAlertDescription></UiAlert
+        >
+        <UiDialogFooter
+          ><UiButton type="button" variant="outline" :disabled="saving" @click="showCreate = false"
+            >Cancel</UiButton
+          ><UiButton type="submit" :disabled="saving"
+            ><UiSpinner v-if="saving" data-icon="inline-start" />{{ saving ? 'Creating…' : 'Create ticket'
+            }}<ArrowRight v-if="!saving" data-icon="inline-end" /></UiButton
+        ></UiDialogFooter>
+      </form>
+    </AppModal>
   </div>
 </template>

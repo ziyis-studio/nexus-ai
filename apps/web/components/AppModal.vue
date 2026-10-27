@@ -1,36 +1,46 @@
 <script setup lang="ts">
-const props = defineProps<{ open: boolean; title: string; wide?: boolean }>()
+import { cn } from '~/lib/utils'
+const props = defineProps<{
+  open: boolean
+  title: string
+  description?: string
+  wide?: boolean
+  busy?: boolean
+}>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
-const dialog = ref<HTMLDialogElement | null>(null)
+let opener: HTMLElement | null = null
 watch(
   () => props.open,
-  async (value) => {
-    await nextTick()
-    if (value && !dialog.value?.open) dialog.value?.showModal()
-    else if (!value) dialog.value?.close()
+  (open) => {
+    if (open) opener = document.activeElement as HTMLElement | null
   },
-  { immediate: true },
 )
-onMounted(() => {
-  if (props.open) dialog.value?.showModal()
-})
+const update = (open: boolean) => {
+  if (!props.busy) emit('update:open', open)
+}
+const restoreFocus = (event: Event) => {
+  if (opener?.isConnected) {
+    event.preventDefault()
+    opener.focus()
+  }
+}
 </script>
 <template>
-  <dialog
-    ref="dialog"
-    class="modal"
-    :class="{ 'modal-wide': wide }"
-    @close="emit('update:open', false)"
-    @click="
-      (event) => {
-        if (event.target === dialog) dialog?.close()
-      }
-    "
-  >
-    <div class="modal-header">
-      <h2>{{ title }}</h2>
-      <button class="icon-btn" aria-label="Close dialog" @click="dialog?.close()"><NIcon name="X" /></button>
-    </div>
-    <slot />
-  </dialog>
+  <UiDialog :open="open" @update:open="update">
+    <UiDialogContent
+      :class="cn('max-h-[90svh] overflow-y-auto p-6', wide ? 'sm:max-w-3xl' : 'sm:max-w-xl')"
+      :show-close-button="!busy"
+      @close-auto-focus="restoreFocus"
+      @escape-key-down="busy && $event.preventDefault()"
+      @interact-outside="busy && $event.preventDefault()"
+    >
+      <UiDialogHeader>
+        <UiDialogTitle>{{ title }}</UiDialogTitle>
+        <UiDialogDescription :class="cn(!description && 'sr-only')">{{
+          description || title
+        }}</UiDialogDescription>
+      </UiDialogHeader>
+      <slot />
+    </UiDialogContent>
+  </UiDialog>
 </template>

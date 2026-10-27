@@ -26,6 +26,11 @@ const db = pg.getPgClient()
 await db.connect()
 const query = (sql, params) => db.query(sql, params)
 const adapter = { exec: (sql) => db.query(sql), query }
+// Existing previews predate the hosted API-role grants migration. Keep this
+// synthetic platform role available when upgrading their persisted schema.
+await query(
+  'do $$ begin create role service_role nologin; exception when duplicate_object then null; end $$;',
+)
 const fresh = !(await query("select 1 from pg_namespace where nspname='nexus_private'")).rowCount
 if (fresh) {
   await adapter.exec(shim)

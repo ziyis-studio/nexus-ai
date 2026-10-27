@@ -1,13 +1,15 @@
 <script setup lang="ts">
+import { ArrowRight, BookOpen, Eye, EyeOff, Inbox, ShieldCheck, Sparkles } from '@lucide/vue'
 const auth = useAuth()
 const email = ref('')
 const password = ref('')
+const passwordVisible = ref(false)
 const busy = ref(false)
 const error = ref('')
 const submit = async () => {
   if (busy.value) return
   if (!auth.supabase) {
-    error.value = 'Authentication is not configured. Follow the deployment guide to connect Supabase.'
+    error.value = 'Sign-in is temporarily unavailable. Contact your workspace administrator.'
     return
   }
   busy.value = true
@@ -31,61 +33,93 @@ const submit = async () => {
 }
 </script>
 <template>
-  <div class="login-frame">
-    <div class="login-story">
-      <div class="brand">
-        <span class="brand-symbol">N</span><span>NEXUS<span class="brand-ai">AI</span></span>
-      </div>
-      <div class="story-content">
-        <div class="eyebrow">THE HUMAN SIDE OF INTELLIGENCE</div>
-        <h1>Less noise.<br />More understanding.</h1>
-        <p>
-          Turn customer conversations into clear next steps. Grounded in your knowledge. Guided by your team.
-        </p>
-        <div class="story-visual">
-          <div class="orbit orbit-one" />
-          <div class="orbit orbit-two" />
-          <div class="orbit orbit-three" />
-          <span class="orbit-core"><NIcon name="Sparkles" :size="36" /></span>
-          <div class="orbit-label label-one"><NIcon name="Inbox" />Customer context</div>
-          <div class="orbit-label label-two"><NIcon name="BookOpen" />Your knowledge</div>
-          <div class="orbit-label label-three"><NIcon name="ShieldCheck" />Human judgment</div>
+  <div class="login-page">
+    <aside class="login-intro">
+      <div class="brand-link"><BrandMark class="size-8 text-sidebar-primary" /><span>Nexus /</span></div>
+      <div class="login-narrative">
+        <h1>Good support.<br />Clearer decisions.</h1>
+        <p>Bring customer context, your team’s knowledge, and AI into one focused workspace.</p>
+        <div class="login-diagram" aria-label="Your support workflow">
+          <div class="login-step">
+            <Inbox class="size-5 shrink-0" /><span
+              ><strong>Start with the conversation</strong
+              ><small>Keep the customer’s needs in focus.</small></span
+            >
+          </div>
+          <div class="login-step">
+            <BookOpen class="size-5 shrink-0" /><span
+              ><strong>Add the right context</strong
+              ><small>Ground every draft in your knowledge.</small></span
+            >
+          </div>
+          <div class="login-step">
+            <Sparkles class="size-5 shrink-0" /><span
+              ><strong>Make the final call</strong
+              ><small>Review, approve, and respond with confidence.</small></span
+            >
+          </div>
         </div>
       </div>
-      <span class="login-copyright">NEXUS AI · Ticket intelligence engine</span>
-    </div>
-    <main class="login-form-area">
-      <form class="login-form" @submit.prevent="submit">
-        <span class="eyebrow">YOUR WORKSPACE AWAITS</span>
-        <h2>Welcome back.</h2>
-        <p>Sign in to bring clarity to your customer support.</p>
-        <label for="email">Work email</label
-        ><input
-          id="email"
-          v-model="email"
-          type="email"
-          placeholder="you@company.com"
-          autocomplete="username"
-          required
-          maxlength="254"
-        /><label for="password">Password</label
-        ><input
-          id="password"
-          v-model="password"
-          type="password"
-          placeholder="Enter your password"
-          autocomplete="current-password"
-          required
-        />
-        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-        <button class="btn btn-primary login-submit" :disabled="busy">
-          <span v-if="busy" class="spinner" />{{ busy ? 'Signing in…' : 'Sign in to workspace'
-          }}<NIcon name="ArrowRight" />
-        </button>
-        <div class="login-security">
-          <NIcon name="ShieldCheck" :size="15" />Secure access. Your organization’s data stays yours.
+      <footer class="sidebar-caption">Nexus · Support intelligence, with a human perspective.</footer>
+    </aside>
+    <main class="login-form-section">
+      <div class="absolute right-5 top-5"><AppearanceMenu /></div>
+      <form class="login-form" :aria-busy="busy" @submit.prevent="submit">
+        <div>
+          <h1>Welcome back.</h1>
+          <p class="page-description">Sign in to your team’s workspace.</p>
         </div>
-        <p class="login-help">Need access? Contact your workspace administrator.</p>
+        <UiFieldGroup>
+          <UiField :data-invalid="!!error || undefined"
+            ><UiFieldLabel for="email">Work email</UiFieldLabel
+            ><UiInput
+              id="email"
+              v-model="email"
+              type="email"
+              placeholder="you@company.com"
+              autocomplete="username"
+              required
+              maxlength="254"
+              :aria-invalid="!!error"
+              :disabled="busy"
+          /></UiField>
+          <UiField :data-invalid="!!error || undefined"
+            ><UiFieldLabel for="password">Password</UiFieldLabel>
+            <UiInputGroup
+              ><UiInputGroupInput
+                id="password"
+                v-model="password"
+                :type="passwordVisible ? 'text' : 'password'"
+                placeholder="Enter your password"
+                autocomplete="current-password"
+                required
+                :aria-invalid="!!error"
+                :disabled="busy" /><UiInputGroupAddon align="inline-end"
+                ><UiInputGroupButton
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  :aria-label="passwordVisible ? 'Hide password' : 'Show password'"
+                  @click="passwordVisible = !passwordVisible"
+                  ><EyeOff v-if="passwordVisible" /><Eye v-else /></UiInputGroupButton></UiInputGroupAddon
+            ></UiInputGroup>
+          </UiField>
+        </UiFieldGroup>
+        <UiAlert v-if="error" variant="destructive" role="alert"
+          ><UiAlertTitle>Sign-in unsuccessful</UiAlertTitle
+          ><UiAlertDescription>{{ error }}</UiAlertDescription></UiAlert
+        >
+        <UiButton type="submit" size="lg" class="w-full" :disabled="busy"
+          ><UiSpinner v-if="busy" data-icon="inline-start" />{{ busy ? 'Signing in…' : 'Sign in to workspace'
+          }}<ArrowRight v-if="!busy" data-icon="inline-end"
+        /></UiButton>
+        <UiSeparator />
+        <div class="flex flex-col gap-3 text-center text-xs text-muted-foreground">
+          <p class="flex items-center justify-center gap-2">
+            <ShieldCheck class="size-4" />Private access to your organization.
+          </p>
+          <p>Need an account? Contact your workspace administrator.</p>
+        </div>
       </form>
     </main>
   </div>

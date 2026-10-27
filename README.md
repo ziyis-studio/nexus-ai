@@ -21,6 +21,8 @@ A multi-tenant ticket intelligence engine built with Nuxt, FastAPI, Supabase Pos
 
 The approved [PRD](docs/PRD.md) defines P0. Semantic search, invitations, billing and external delivery remain future scope.
 
+The interface uses shadcn-vue / Reka with shared components, light/dark appearance, keyboard quick navigation and responsive support workflows. [Interface guidance](docs/UI_DESIGN.md) · [Dark view](docs/screenshots/dark.png) · [Organization settings](docs/screenshots/settings.png).
+
 ## Try the portable preview
 
 Requirements: **Node 24.22.1**, **Python 3.12.14**, **uv** and Git.
@@ -87,4 +89,4 @@ Browser tests need the running test environment and Chromium (`npx playwright in
 
 ## Delivery status
 
-P0 source and runnable review environment are implemented. All six CI jobs passed, including real local Supabase Auth, real Redis, native PostgreSQL and Docker builds. Hosted production acceptance still requires owner configuration, a real OpenAI call and review of the documented upstream development-tooling advisory. No hosted production deployment or live-account model inference is implied by fixture tests. See the release status for the precise evidence.
+P0 source and runnable review environment are implemented. All six CI jobs passed, including real local Supabase Auth, real Redis, native PostgreSQL and Docker builds. Hosted production acceptance still requires owner configuration, a real OpenAI call and real-account cloud verification. No hosted production deployment or live-account model inference is implied by fixture tests. See the release status for the precise evidence.
