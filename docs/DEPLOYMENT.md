@@ -49,6 +49,8 @@ For the real local Supabase test path without putting credentials into terminal 
 
 ## Hosted staging
 
+The DEMO / Nexus hosted database has been provisioned; see [its current schema, connection details and verification](HOSTED_DATABASE.md). This does not imply that the application services are deployed.
+
 1. Choose a dedicated Supabase project and apply the versioned migrations with the pinned CLI. The existing Planner Core project is unrelated and must not be modified.
 2. Configure the public Supabase URL/key and exact HTTPS frontend origins. Set `ENVIRONMENT=production`, keep `VERIFY_SESSION=true`, configure the actual JWT algorithm, and set the server OpenAI key/model.
 3. Create a dedicated database login with membership in `nexus_worker`. Use a direct database or session-pooler connection; transaction pooling does not preserve `SET ROLE`.

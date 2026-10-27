@@ -25,9 +25,13 @@ Implementation candidate for PRD P0. This document distinguishes source completi
 
 All six jobs passed for application commit [`e3e7fef`](https://github.com/ziyis-studio/nexus-ai/actions/runs/40397925356): backend, web, native database, real Redis integration/browser tests, Docker builds, and real local Supabase. Supabase pgTAP reported 10 passing grant/RLS checks; security advisors passed the error-level gate; the real Auth-to-worker-to-review and logout/revoked-session scenario passed. Later documentation/benchmark/preview updates are rechecked on the PR before merge.
 
+## Hosted database
+
+The DEMO / Nexus Supabase database (`qgooyiokuclpijdwdpzt`) is provisioned with all versioned migrations, seven RLS-protected tables, nineteen policies and the two demo tenants. Hosted PostgreSQL rollback checks passed for isolation, permissions and the analysis/review lifecycle; anonymous HTTPS reads of all seven tables were denied. Security advisors report zero findings, with no performance warnings. [Connection details and verification limits](HOSTED_DATABASE.md).
+
 ## Remaining staging configuration
 
-- Hosted Supabase provisioning, real-account cloud sign-in and revocation, production WSS/origin configuration, a real OpenAI inference and deployed performance measurements require owner-selected infrastructure and secrets.
+- Real-account cloud sign-in and revocation, application/Redis hosting, a dedicated worker login, production WSS/origin configuration, a real OpenAI inference and deployed performance measurements require hosting configuration and server-side secrets.
 - Upstream development TLS dependency advisory requires continued review. The P0 production acceptance gate is not declared passed while this remains unresolved.
 
 The portable preview is a functioning review environment with native PostgreSQL and PostgREST, synthetic identity, Fakeredis transport and deterministic model output. It is never a claim of real OpenAI inference or a hosted production deployment. The existing Planner Core Supabase project has not been modified.

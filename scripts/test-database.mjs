@@ -6,6 +6,9 @@ import { performance } from 'node:perf_hooks'
 export const shim = `
 do $$ begin create role anon nologin; exception when duplicate_object then null; end $$;
 do $$ begin create role authenticated nologin; exception when duplicate_object then null; end $$;
+do $$ begin create role service_role nologin; exception when duplicate_object then null; end $$;
+-- Match the hosted default grants that a PUBLIC-only revoke does not remove.
+alter default privileges in schema public grant execute on functions to anon,authenticated,service_role;
 create schema auth;
 create table auth.users(id uuid primary key, email text);
 create table auth.sessions(id uuid primary key, user_id uuid references auth.users(id));
@@ -308,6 +311,13 @@ async function main() {
     )
   })
   await check('anon cannot execute privileged helpers', async () => {
+    const grants = await db.query(`
+      select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+      where n.nspname='public' and p.proname in ('create_analysis','review_analysis','session_active')
+      and (has_function_privilege('anon',p.oid,'EXECUTE')
+        or has_function_privilege('service_role',p.oid,'EXECUTE'))
+    `)
+    assert.equal(grants.rows.length, 0)
     await denied(() =>
       db.transaction(async (tx) => {
         await tx.exec('set local role anon')

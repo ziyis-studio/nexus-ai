@@ -144,6 +144,22 @@ jobs:
       - run: |
           mkdir -p .local
           npx supabase status -o json > .local/supabase-status.json
+          uv run python - <<'PY'
+          import json
+          from pathlib import Path
+          import psycopg
+          status = json.loads(Path('.local/supabase-status.json').read_text())
+          with psycopg.connect(status['DB_URL'], autocommit=True) as db:
+              cursor = db.execute(Path('scripts/verify-hosted-db.sql').read_text())
+              result = None
+              while True:
+                  if cursor.description:
+                      result = cursor.fetchone()
+                  if not cursor.nextset():
+                      break
+          assert result == ('passed', 'all test fixtures rolled back'), result
+          print('Supabase database rollback smoke passed.')
+          PY
           uv run python scripts/run-supabase-services.py > .local/real-services.log 2>&1 &
           for i in {1..60}; do curl -fsS http://127.0.0.1:8000/health/ready && break; sleep 2; done
           curl -fsS http://127.0.0.1:8000/health/ready
