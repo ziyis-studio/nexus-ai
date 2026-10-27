@@ -518,6 +518,11 @@
     padding: 18px;
   }
 }
+html[data-theme-changing] *,
+html[data-theme-changing] *::before,
+html[data-theme-changing] *::after {
+  transition: none !important;
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

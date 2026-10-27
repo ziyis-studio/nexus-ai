@@ -1,4 +1,5 @@
 export type Appearance = 'light' | 'dark' | 'system'
+let themeFrame: number | undefined
 
 export const useAppearance = () => {
   const appearance = useState<Appearance>('appearance', () => 'light')
@@ -11,8 +12,17 @@ export const useAppearance = () => {
     }
     const dark =
       value === 'dark' || (value === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
-    document.documentElement.classList.toggle('dark', dark)
-    document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+    const root = document.documentElement
+    if (themeFrame !== undefined) cancelAnimationFrame(themeFrame)
+    root.setAttribute('data-theme-changing', '')
+    root.classList.toggle('dark', dark)
+    root.style.colorScheme = dark ? 'dark' : 'light'
+    // Commit the palette together so inherited text cannot outrun background transitions.
+    void root.offsetHeight
+    themeFrame = requestAnimationFrame(() => {
+      root.removeAttribute('data-theme-changing')
+      themeFrame = undefined
+    })
   }
   return { appearance, setAppearance }
 }
